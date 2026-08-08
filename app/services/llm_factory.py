@@ -110,7 +110,6 @@ def create_llm(
                 return resp
 
             def invoke(self, *args, **kwargs):
-                # Circuit breaker: если 404 на модель — пробуем fallback без tools
                 last_err = None
                 for attempt in range(2):
                     try:
@@ -119,7 +118,6 @@ def create_llm(
                     except Exception as e:
                         msg = str(e).lower()
                         last_err = e
-                        # 404/NotFound — модель не существует, пробуем без tools или с другой моделью
                         if "404" in msg or "not_found" in msg or "not found" in msg:
                             logger.warning("OpenAI-compat 404 on %s (attempt %d): %s", model_name, attempt, e)
                             if attempt == 0:
@@ -127,21 +125,43 @@ def create_llm(
                                 kwargs.pop("tool_choice", None)
                                 time.sleep(0.5)
                                 continue
-                        # tuple index — баг сериализации muse-spark, ретрай без tools
                         if "tuple" in msg and "index" in msg:
-                            logger.warning("OpenAI-compat tuple error, retry without tools: %s", e)
+                            logger.warning("OpenAI-compat tuple error attempt %d: %s", attempt, e)
                             kwargs.pop("tools", None)
                             kwargs.pop("tool_choice", None)
                             if attempt == 0:
                                 time.sleep(0.5)
                                 continue
-                        # 429 — rate limit, не ретраим тут (slowapi уже режет)
                         raise
                 raise last_err if last_err else RuntimeError("LLM invoke failed")
 
             async def ainvoke(self, *args, **kwargs):
-                # Для ainvoke — синхронный fallback
                 return self.invoke(*args, **kwargs)
+
+            def stream(self, *args, **kwargs):
+                # BigTech: stream тоже может отдать tuple — нормализуем
+                try:
+                    for chunk in super().stream(*args, **kwargs):
+                        yield self._normalize_content(chunk)
+                except Exception as e:
+                    if "tuple" in str(e).lower():
+                        logger.warning("Stream tuple error, fallback to invoke: %s", e)
+                        yield self.invoke(*args, **kwargs)
+                    else:
+                        raise
+
+            async def astream(self, *args, **kwargs):
+                async for chunk in super().astream(*args, **kwargs):
+                    yield self._normalize_content(chunk)
+
+            def batch(self, *args, **kwargs):
+                # batch может вернуть list[BaseMessage] с tuple content
+                res = super().batch(*args, **kwargs)
+                return [self._normalize_content(r) for r in res]
+
+            async def abatch(self, *args, **kwargs):
+                res = await super().abatch(*args, **kwargs)
+                return [self._normalize_content(r) for r in res]
 
         llm = _ResilientChatOpenAI(
             model=model_name,
