@@ -38,11 +38,11 @@ DEFAULT_PROVIDERS = {
     },
     "gemini": {
         "name": "Google Gemini",
-        "type": "gemini",              # Vision fallback only — чат его не использует
+        "type": "gemini",              # Vision fallback only — чат fallback если muse_spark без ключа
         "api_key": "",
         "models": {
-            "fast": "gemini-2.0-flash",
-            "pro": "gemini-1.5-pro",
+            "fast": "gemini-1.5-flash",
+            "pro": "gemini-1.5-flash",
         },
         "enabled": False,
     },
@@ -91,17 +91,16 @@ def load_providers() -> dict:
         for k, v in DEFAULT_PROVIDERS.items():
             if k not in saved:
                 saved[k] = v
-        # Миграция устаревших моделей Gemini 2.5 → 2.0 (404 NOT_FOUND для новых юзеров)
+        # Миграция устаревших моделей Gemini 2.5/2.0 → 1.5-flash (404 для новых юзеров, Interactions API)
         if "gemini" in saved and "models" in saved["gemini"]:
             m = saved["gemini"]["models"]
-            if m.get("fast") == "gemini-2.5-flash":
-                m["fast"] = "gemini-2.0-flash"
-            if m.get("pro") == "gemini-2.5-pro":
-                m["pro"] = "gemini-1.5-pro"
-            # если модель всё ещё 2.5 — форсим дефолт
-            if "2.5" in m.get("fast",""):
+            if m.get("fast") in ("gemini-2.5-flash", "gemini-2.0-flash"):
+                m["fast"] = "gemini-1.5-flash"
+            if m.get("pro") in ("gemini-2.5-pro", "gemini-1.5-pro", "gemini-2.0-flash"):
+                m["pro"] = "gemini-1.5-flash"
+            if "2.5" in m.get("fast","") or "2.0" in m.get("fast",""):
                 m["fast"] = DEFAULT_PROVIDERS["gemini"]["models"]["fast"]
-            if "2.5" in m.get("pro",""):
+            if "2.5" in m.get("pro","") or "2.0" in m.get("pro",""):
                 m["pro"] = DEFAULT_PROVIDERS["gemini"]["models"]["pro"]
             # сохраняем миграцию
             try:
