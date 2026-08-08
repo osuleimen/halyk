@@ -73,8 +73,8 @@ code{font-family:var(--mono)}
 .btn-icon:hover{color:var(--text);background:var(--surface3)}
 /* Layout - resizable */
 .layout{display:flex;height:calc(100vh - 56px);overflow:hidden;position:relative}
-.chat-pane{flex:1 1 0;min-width:320px;display:flex;flex-direction:column;min-width:0;background:var(--bg);overflow:hidden}
-.artifacts-pane{width:420px;min-width:320px;max-width:65%;flex-shrink:0;background:var(--surface);overflow:auto;display:flex;flex-direction:column;gap:14px;padding:16px;overscroll-behavior:contain}
+.chat-pane{flex:1 1 0;min-width:280px;display:flex;flex-direction:column;min-width:280px;background:var(--bg);overflow:hidden}
+.artifacts-pane{width:420px;min-width:280px;max-width:75%;flex-shrink:0;background:var(--surface);overflow:auto;display:flex;flex-direction:column;gap:14px;padding:16px;overscroll-behavior:contain}
 .artifacts-pane::-webkit-scrollbar{width:6px}
 .artifacts-pane::-webkit-scrollbar-thumb{background:var(--border);border-radius:999px}
 .separator{width:8px;flex-shrink:0;background:var(--border-soft);cursor:col-resize;display:flex;align-items:center;justify-content:center;transition:background .15s;user-select:none;position:relative}
@@ -284,6 +284,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
       </div>
     </div>
   </section>
+  <div class="separator" id="separator" title="Потяни чтобы изменить ширину"></div>
 
   <!-- RIGHT: Artifacts -->
   <aside class="artifacts-pane">
@@ -1023,6 +1024,60 @@ function clearSettings(){
   showToast('Очищено');
 }
 document.getElementById('settingsModal').addEventListener('click',e=>{ if(e.target.id==='settingsModal') closeSettings(); });
+
+// Resizable separator — чат / артефакты
+(function(){
+  const sep=document.getElementById('separator');
+  const artifacts=document.querySelector('.artifacts-pane');
+  const layout=document.querySelector('.layout');
+  if(!sep||!artifacts) return;
+  // restore
+  const saved=localStorage.getItem('artifacts_width');
+  if(saved && parseInt(saved)>280 && parseInt(saved)<900){
+    artifacts.style.width=saved+'px';
+  }
+  let dragging=false, startX=0, startW=0;
+  sep.addEventListener('mousedown',e=>{
+    dragging=true; startX=e.clientX; startW=artifacts.getBoundingClientRect().width;
+    sep.classList.add('dragging'); document.body.style.cursor='col-resize'; document.body.style.userSelect='none';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!dragging) return;
+    const dx=startX - e.clientX; // тянем влево — увеличиваем артефакты (чат уменьшается)
+    let newW=startW + dx;
+    newW=Math.max(280, Math.min(newW, window.innerWidth*0.75));
+    newW=Math.min(newW, window.innerWidth - 280);
+    artifacts.style.width=newW+'px';
+    // flex чата подстроится автоматически, можно уменьшить до 280px
+  });
+  window.addEventListener('mouseup',()=>{
+    if(!dragging) return;
+    dragging=false; sep.classList.remove('dragging'); document.body.style.cursor=''; document.body.style.userSelect='';
+    localStorage.setItem('artifacts_width', Math.round(artifacts.getBoundingClientRect().width));
+  });
+  // touch
+  sep.addEventListener('touchstart',e=>{
+    dragging=true; startX=e.touches[0].clientX; startW=artifacts.getBoundingClientRect().width; sep.classList.add('dragging');
+  },{passive:true});
+  window.addEventListener('touchmove',e=>{
+    if(!dragging) return;
+    const dx=startX - e.touches[0].clientX;
+    let newW=startW + dx;
+    newW=Math.max(280, Math.min(newW, window.innerWidth*0.75));
+    newW=Math.min(newW, window.innerWidth - 280);
+    artifacts.style.width=newW+'px';
+  },{passive:true});
+  window.addEventListener('touchend',()=>{
+    if(!dragging) return;
+    dragging=false; sep.classList.remove('dragging');
+    localStorage.setItem('artifacts_width', Math.round(artifacts.getBoundingClientRect().width));
+  });
+  // double click — сброс
+  sep.addEventListener('dblclick',()=>{
+    artifacts.style.width='420px'; localStorage.removeItem('artifacts_width');
+  });
+})();
 
 // Refresh
 async function refreshAll(){
