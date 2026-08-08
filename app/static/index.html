@@ -3,762 +3,1030 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Halyk AI Challenge — Covenant Agent | muse-spark</title>
+<title>Halyk Covenant Agent — halyk.wit.kz</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --halyk-green:#1DB954; /* fallback */
-  --halyk-dark:#0A1210;
-  --halyk-green-deep:#0B7A3B;
-  --halyk-green-bright:#20D68A;
-  --bg:#0B0F0E;
-  --surface:#151C1A;
-  --surface2:#1D2724;
-  --surface3:#22302C;
-  --border:#2A3A36;
-  --text:#E8F0EC;
-  --text-dim:#9AA8A2;
-  --text-faint:#6B7B75;
-  --accent:#1DB954;
-  --accent-dim:#1DB95422;
-  --breach:#FF5A5A;
-  --breach-dim:#FF5A5A18;
-  --compliant:#1DB954;
-  --compliant-dim:#1DB95418;
-  --warning:#F5B945;
-  --blue:#4F8BFF;
+  --bg:#0B0F11;
+  --surface:#131A1E;
+  --surface2:#1A252B;
+  --surface3:#22333B;
+  --border:#263840;
+  --border-soft:#1E2E36;
+  --text:#E6EEF2;
+  --text-dim:#8FA0AD;
+  --text-faint:#6B7E8E;
+  --accent:#00C070;
+  --accent-strong:#00B368;
+  --accent-dim:#00C07014;
+  --accent-border:#00C07030;
+  --breach:#FF5252;
+  --breach-dim:#FF525214;
+  --breach-border:#FF525230;
+  --compliant:#00C070;
+  --warning:#EAB308;
+  --blue:#3B82F6;
   --radius:14px;
+  --radius-sm:10px;
+  --radius-xs:8px;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Inter',sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
-a{color:var(--accent)}
+html,body{height:100%}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+button{font-family:inherit}
+code{font-family:var(--mono)}
 /* Header */
-header{
-  background:linear-gradient(135deg, #0F201B 0%, #1A3328 60%, #143624 100%);
-  border-bottom:1px solid var(--border);
-  padding:16px 28px;
-  display:flex;align-items:center;justify-content:space-between;gap:16px;
-  position:sticky;top:0;z-index:100;backdrop-filter:blur(10px);
+.header{
+  height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:0 20px;background:var(--surface);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);
 }
-.halyk-brand{display:flex;align-items:center;gap:14px}
-.halyk-logo{width:42px;height:42px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#062015;letter-spacing:-1px}
-.halyk-title h1{font-size:16px;font-weight:700;letter-spacing:-0.02em}
-.halyk-title h1 span{color:var(--accent)}
-.halyk-title p{font-size:11px;color:var(--text-dim);margin-top:2px}
-.header-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.model-badge{background:var(--accent);color:#062015;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:6px}
-.model-badge small{font-weight:600;opacity:0.8}
-.status-badge{padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase}
-.status-idle{background:var(--surface2);color:var(--text-dim);border:1px solid var(--border)}
-.status-running{background:var(--accent-dim);color:var(--accent);border:1px solid #1DB95444;animation:pulse 1.8s infinite}
-.status-done{background:var(--compliant-dim);color:var(--compliant);border:1px solid #1DB95444}
-.status-error{background:var(--breach-dim);color:var(--breach);border:1px solid #FF5A5A33}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
-/* Tabs */
-.tabs-wrap{padding:16px 24px 0;max-width:1400px;margin:0 auto}
-.tabs{display:inline-flex;gap:4px;background:var(--surface);padding:4px;border-radius:12px;border:1px solid var(--border)}
-.tab{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text-dim);transition:.18s;user-select:none}
-.tab:hover{color:var(--text);background:var(--surface2)}
-.tab.active{background:var(--accent);color:#062015;font-weight:700}
-.tab-content{display:none;padding:18px 24px 28px;max-width:1400px;margin:0 auto}
-.tab-content.active{display:block}
-.container{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.full-width{grid-column:1 / -1}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
-.card-title{font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.card-title .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
-.progress-bar{width:100%;height:8px;background:var(--surface2);border-radius:999px;overflow:hidden;margin:12px 0}
-.progress-fill{height:100%;background:linear-gradient(90deg, var(--accent), #2ED8A0);border-radius:999px;transition:width .6s ease}
-.progress-text{font-size:12px;color:var(--text-dim)}
-button{padding:8px 16px;border:none;border-radius:9px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
-.btn-primary{background:var(--accent);color:#062015}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px #1DB95430}
-.btn-primary:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
-.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand-logo{width:36px;height:36px;border-radius:10px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#062015;font-weight:800;font-size:14px;letter-spacing:-0.5px;flex-shrink:0}
+.brand-text{min-width:0}
+.brand-text h1{font-size:14px;font-weight:700;letter-spacing:-0.02em;line-height:1.1}
+.brand-text h1 span{color:var(--accent)}
+.brand-text p{font-size:11px;color:var(--text-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.header-center{display:flex;align-items:center;gap:10px}
+.model-pill{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);padding:6px 10px;border-radius:999px;font-size:11px;font-weight:600;color:var(--text-dim)}
+.model-pill b{color:var(--text);font-weight:700}
+.model-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.status-pill{padding:6px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border:1px solid var(--border)}
+.status-idle{background:var(--surface2);color:var(--text-dim)}
+.status-running{background:var(--accent-dim);color:var(--accent);border-color:var(--accent-border)}
+.status-done{background:#00C07018;color:var(--compliant);border-color:var(--accent-border)}
+.status-error{background:var(--breach-dim);color:var(--breach);border-color:var(--breach-border)}
+.header-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.btn{padding:8px 14px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid transparent;line-height:1;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#062015;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent-strong);transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn-secondary{background:var(--surface2);color:var(--text);border-color:var(--border)}
 .btn-secondary:hover{background:var(--surface3)}
-.btn-ghost{background:transparent;color:var(--text-dim);border:1px dashed var(--border)}
-.btn-danger{background:var(--breach-dim);color:var(--breach);border:1px solid #FF5A5A33}
-.btn-small{padding:6px 10px;font-size:11px;border-radius:7px}
-.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.chip{padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim)}
-.chip.on{background:var(--accent-dim);color:var(--accent);border-color:#1DB95433}
-/* Score */
-.score-big{font-size:48px;font-weight:800;background:linear-gradient(135deg, var(--accent), #2ED8A0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;line-height:1}
-.score-detail{text-align:center;color:var(--text-dim);font-size:12px;margin-top:6px}
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.stat-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
-.stat-value{font-size:22px;font-weight:800;color:var(--text)}
-.stat-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
-.honest-banner{background:linear-gradient(135deg, #1DB95414, #1DB95408);border:1px solid #1DB95433;border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:12px}
-.honest-banner .icon{width:36px;height:36px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px}
-.honest-banner b{color:var(--accent)}
-/* Tables */
-.answers-table{width:100%;border-collapse:collapse;font-size:12px}
-.answers-table th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
-.answers-table td{padding:8px 10px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px}
-.answers-table tr:hover{background:var(--surface2)}
-.metrics-table{width:100%;border-collapse:collapse;font-size:12px}
-.metrics-table th{text-align:left;padding:10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-weight:700;font-size:10px;text-transform:uppercase}
-.metrics-table td{padding:10px;border-bottom:1px solid var(--border)}
-.tag-breach{color:var(--breach);background:var(--breach-dim);padding:3px 8px;border-radius:6px;font-weight:700;font-size:11px}
-.tag-compliant{color:var(--compliant);background:var(--compliant-dim);padding:3px 8px;border-radius:6px;font-weight:700;font-size:11px}
-.tag-empty{color:var(--text-faint);font-style:italic}
-.log-container{background:#080C0B;border:1px solid var(--border);border-radius:10px;padding:10px;height:380px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6}
-.log-container div{color:var(--text-dim);white-space:pre-wrap;word-break:break-word}
-/* Provider */
-.provider-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:12px}
-.provider-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;transition:.2s;position:relative}
-.provider-card.active{border-color:var(--accent);box-shadow:0 0 0 3px #1DB95418}
-.provider-card.recommended::after{content:'РЕКОМЕНДУЕТСЯ';position:absolute;top:-8px;right:12px;background:var(--accent);color:#062015;font-size:9px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:.06em}
-.p-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.p-name{font-weight:700;font-size:14px}
-.p-model{font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace}
-.p-status{font-size:11px;padding:3px 9px;border-radius:999px;font-weight:700}
-.p-status-on{background:var(--compliant-dim);color:var(--compliant)}
-.p-status-off{background:var(--surface);color:var(--text-dim);border:1px solid var(--border)}
-input[type="text"],input[type="password"],textarea,select{width:100%;padding:9px 11px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;margin:6px 0}
-textarea{font-family:'Inter',sans-serif}
-input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #1DB95418}
-.toggle{position:relative;width:42px;height:24px;cursor:pointer;display:inline-block}
-.toggle input{opacity:0;width:0;height:0}
-.toggle .slider{position:absolute;inset:0;background:var(--surface3);border-radius:999px;border:1px solid var(--border);transition:.2s}
-.toggle .slider::before{content:'';position:absolute;width:18px;height:18px;left:2px;bottom:2px;background:var(--text-dim);border-radius:50%;transition:.2s}
-.toggle input:checked + .slider{background:var(--accent-dim);border-color:var(--accent)}
-.toggle input:checked + .slider::before{transform:translateX(18px);background:var(--accent)}
-.toast{position:fixed;bottom:20px;right:20px;padding:12px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:13px;z-index:1200;display:none;box-shadow:0 12px 40px #00000066;max-width:420px}
-.toast.success{border-color:var(--accent)}
-.toast.error{border-color:var(--breach)}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:none;justify-content:center;align-items:center;z-index:1100;padding:16px}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;max-width:620px;width:100%;box-shadow:0 20px 60px #00000066;max-height:90vh;overflow:auto}
-.modal h2{color:var(--text);margin-bottom:10px;font-size:18px;display:flex;align-items:center;gap:8px}
-.modal p{color:var(--text-dim);font-size:13px;line-height:1.6;margin-bottom:16px}
-.modal-buttons{display:flex;gap:10px;justify-content:flex-end}
-.loading-spinner{display:inline-block;width:14px;height:14px;border:2px solid #FFFFFF55;border-radius:50%;border-top-color:#fff;animation:spin 1s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-/* ===== Mobile: BigTech — корректно отображает, удобно одной рукой ===== */
+.btn-ghost{background:transparent;color:var(--text-dim);border-color:var(--border)}
+.btn-ghost:hover{background:var(--surface2);color:var(--text)}
+.btn-icon{width:36px;height:36px;padding:0;border-radius:9px;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.btn-icon:hover{color:var(--text);background:var(--surface3)}
+/* Layout */
+.layout{display:grid;grid-template-columns:minmax(0,1.35fr) 420px;height:calc(100vh - 56px);overflow:hidden}
+.chat-pane{display:flex;flex-direction:column;min-width:0;background:var(--bg);border-right:1px solid var(--border-soft);overflow:hidden}
+.artifacts-pane{background:var(--surface);overflow:auto;display:flex;flex-direction:column;gap:14px;padding:16px}
+.artifacts-pane::-webkit-scrollbar{width:6px}
+.artifacts-pane::-webkit-scrollbar-thumb{background:var(--border);border-radius:999px}
+/* Pipeline strip */
+.pipeline-strip{display:flex;align-items:center;gap:6px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border-soft);overflow-x:auto;scrollbar-width:none}
+.pipeline-strip::-webkit-scrollbar{display:none}
+.step-chip{display:flex;align-items:center;gap:8px;padding:7px 11px;border-radius:999px;background:var(--surface2);border:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-dim);white-space:nowrap;flex-shrink:0}
+.step-chip.on{background:var(--accent-dim);color:var(--accent);border-color:var(--accent-border)}
+.step-chip.done{background:var(--accent-dim);color:var(--accent);border-color:var(--accent-border)}
+.step-num{width:20px;height:20px;border-radius:50%;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0}
+.step-chip.on .step-num{background:var(--accent);color:#062015}
+.step-chip.done .step-num{background:var(--accent);color:#062015}
+.step-arrow{color:var(--text-faint);font-size:12px;flex-shrink:0}
+/* Chat */
+.chat-history{flex:1;overflow:auto;padding:20px 16px;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth}
+.chat-history::-webkit-scrollbar{width:6px}
+.chat-history::-webkit-scrollbar-thumb{background:var(--border);border-radius:999px}
+.msg{max-width:92%;display:flex;flex-direction:column;gap:6px}
+.msg.user{align-self:flex-end;max-width:78%}
+.msg.agent{align-self:flex-start}
+.msg.system{align-self:center;max-width:92%}
+.bubble{padding:12px 14px;border-radius:14px;font-size:13px;line-height:1.6;word-break:break-word}
+.msg.user .bubble{background:var(--accent);color:#062015;border-radius:16px 16px 4px 16px;font-weight:500}
+.msg.agent .bubble{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:16px 16px 16px 4px}
+.msg.system .bubble{background:var(--surface2);border:1px dashed var(--border);color:var(--text-dim);font-size:12px;text-align:center;border-radius:10px;padding:8px 12px}
+.bubble strong{color:inherit}
+.bubble a{color:var(--accent);text-decoration:underline}
+.msg-meta{font-size:11px;color:var(--text-faint);padding:0 2px}
+.msg.user .msg-meta{text-align:right}
+.tool-card{margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.tool-head{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface3);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text-dim);letter-spacing:.04em;text-transform:uppercase}
+.tool-body{padding:10px 12px;font-family:var(--mono);font-size:11px;line-height:1.6;color:var(--text-dim);white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto}
+.empty-chat{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:40px 16px;text-align:center;color:var(--text-dim)}
+.empty-icon{width:48px;height:48px;border-radius:14px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:22px}
+.empty-chat h3{color:var(--text);font-size:14px;font-weight:700}
+.empty-chat p{font-size:13px;max-width:420px;line-height:1.6}
+.empty-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+/* Chat input */
+.chat-input-wrap{padding:12px 16px;background:var(--surface);border-top:1px solid var(--border-soft);display:flex;flex-direction:column;gap:10px}
+.input-row{display:flex;align-items:flex-end;gap:8px}
+.chat-input{flex:1;min-height:44px;max-height:120px;padding:12px 14px;background:var(--bg);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:13px;resize:none;outline:none;line-height:1.5}
+.chat-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.chat-input::placeholder{color:var(--text-faint)}
+.input-hint{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--text-faint)}
+.hint-chip{padding:4px 8px;border-radius:999px;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-weight:500;cursor:pointer}
+.hint-chip:hover{color:var(--text);border-color:var(--accent-border)}
+.progress-wrap{height:3px;background:var(--surface2);border-radius:999px;overflow:hidden}
+.progress-bar{height:100%;background:linear-gradient(90deg, var(--accent), #2ED8A0);transition:width .6s ease;width:0%}
+/* Artifacts cards */
+.card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:14px;overflow:hidden}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.card-title{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim);display:flex;align-items:center;gap:8px}
+.card-title .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.card-action{font-size:11px}
+.pipeline-vertical{display:flex;flex-direction:column;gap:0;position:relative}
+.pv-step{display:flex;gap:12px;padding:10px 0;position:relative}
+.pv-step:not(:last-child)::before{content:'';position:absolute;left:15px;top:36px;bottom:-6px;width:1px;background:var(--border)}
+.pv-icon{width:30px;height:30px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;z-index:1}
+.pv-step.done .pv-icon{background:var(--accent);border-color:var(--accent);color:#062015}
+.pv-step.running .pv-icon{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.pv-step.error .pv-icon{background:var(--breach-dim);border-color:var(--breach-border);color:var(--breach)}
+.pv-content{flex:1;min-width:0;padding-top:2px}
+.pv-title{font-size:13px;font-weight:700;line-height:1.2}
+.pv-desc{font-size:11px;color:var(--text-dim);margin-top:3px;line-height:1.5}
+.pv-status{font-size:11px;font-weight:700;margin-top:4px;display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--border)}
+.pv-step.done .pv-status{color:var(--compliant);border-color:var(--accent-border);background:var(--accent-dim)}
+.pv-step.running .pv-status{color:var(--accent);border-color:var(--accent-border);background:var(--accent-dim)}
+.data-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.data-item{background:var(--surface3);border:1px solid var(--border);border-radius:10px;padding:10px}
+.data-value{font-size:18px;font-weight:800;line-height:1}
+.data-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.score-row{display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:12px}
+.score-value{font-size:28px;font-weight:800;letter-spacing:-0.03em;color:var(--accent)}
+.score-info{flex:1;min-width:0}
+.score-label{font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em}
+.score-sub{font-size:12px;color:var(--text-dim);margin-top:2px}
+.weights{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.weight-chip{padding:4px 8px;border-radius:999px;background:var(--surface3);border:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-dim)}
+.weight-chip b{color:var(--text)}
+.results-table{width:100%;border-collapse:collapse;font-size:11px}
+.results-table th{text-align:left;padding:8px 8px;border-bottom:1px solid var(--border);color:var(--text-dim);font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:700}
+.results-table td{padding:9px 8px;border-bottom:1px solid var(--border-soft);font-family:var(--mono);font-size:11px}
+.results-table tr:hover{background:var(--surface3)}
+.tag{padding:3px 7px;border-radius:6px;font-weight:800;font-size:10px;letter-spacing:.04em}
+.tag-breach{background:var(--breach-dim);color:var(--breach);border:1px solid var(--breach-border)}
+.tag-compliant{background:var(--accent-dim);color:var(--compliant);border:1px solid var(--accent-border)}
+.tag-idle{color:var(--text-faint)}
+.submission-preview{background:var(--bg);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.preview-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface3);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text-dim)}
+.preview-code{padding:12px;font-family:var(--mono);font-size:11px;line-height:1.6;color:var(--text-dim);white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto}
+.format-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.format-item{display:flex;gap:10px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px}
+.format-icon{width:28px;height:28px;border-radius:8px;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.format-item h4{font-size:12px;font-weight:700}
+.format-item p{font-size:11px;color:var(--text-dim);margin-top:2px;line-height:1.5}
+.deliverables{display:flex;flex-direction:column;gap:8px}
+.deliverable{display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;font-size:12px}
+.deliverable b{font-size:12px}
+.upload-drop{border:1px dashed var(--border);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px;background:var(--bg);cursor:pointer;transition:.15s}
+.upload-drop:hover{border-color:var(--accent);background:var(--accent-dim)}
+.upload-icon{width:36px;height:36px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px}
+.toast{position:fixed;bottom:20px;right:20px;max-width:420px;padding:12px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;font-size:13px;z-index:100;display:none;box-shadow:0 16px 40px rgba(0,0,0,.4)}
+.toast.success{border-color:var(--accent-border)}
+.toast.error{border-color:var(--breach-border)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:90;padding:16px}
+.modal{background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:20px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.modal h2{font-size:16px;font-weight:800;margin-bottom:8px}
+.modal p{font-size:12px;color:var(--text-dim);line-height:1.6;margin-bottom:14px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+input[type="text"],input[type="password"],textarea,select{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:12px}
+input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.muted{color:var(--text-dim)}
+.small{font-size:11px}
+.divider{height:1px;background:var(--border-soft);margin:12px 0}
+/* Responsive */
+@media(max-width:1100px){
+  .layout{grid-template-columns:1fr 380px}
+}
 @media(max-width:900px){
-  .container{grid-template-columns:1fr;gap:12px}
-  .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px}
-  header{flex-direction:column;align-items:flex-start;padding:12px 16px;gap:8px;position:sticky;top:0;z-index:100}
-  .halyk-brand{gap:10px}
-  .halyk-logo{width:38px;height:38px;font-size:16px;border-radius:9px;flex-shrink:0}
-  .halyk-title{flex:1;min-width:0}
-  .halyk-title h1{font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .halyk-title p{font-size:10px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .header-right{width:100%;justify-content:space-between;gap:6px;flex-wrap:nowrap}
-  .header-right .model-badge{flex:1;justify-content:center;min-width:0;font-size:10px;padding:6px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .header-right .model-badge small{display:none}
-  #statusBadge{flex-shrink:0;padding:6px 10px;font-size:10px}
-  .tabs-wrap{padding:8px 12px 0;overflow:hidden;position:sticky;top:64px;z-index:90;background:var(--bg);margin:0 -12px;padding-left:12px;padding-right:12px}
-  .tabs{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap;max-width:100%;gap:3px;padding:3px}
-  .tabs::-webkit-scrollbar{display:none}
-  .tab{white-space:nowrap;flex:0 0 auto;padding:10px 14px;font-size:12px;min-height:40px;display:flex;align-items:center}
-  .tab-content{padding:12px 12px 80px} /* 80px для FAB */
-  .card{padding:14px;border-radius:12px;overflow:hidden}
-  .card-title{font-size:10px;margin-bottom:10px}
-  .honest-banner{flex-direction:column;align-items:flex-start;gap:10px;padding:12px}
-  .honest-banner .icon{width:32px;height:32px;font-size:16px}
-  .honest-banner div[style*="flex:1"]{width:100%}
-  .honest-banner + div{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap !important;padding-bottom:4px}
-  .honest-banner + div .chip{white-space:nowrap;flex:0 0 auto}
-  .provider-grid{grid-template-columns:1fr;gap:10px}
-  .provider-card{padding:14px}
-  .log-container{height:280px;font-size:10px}
-  .answers-table{font-size:10px}
-  .answers-table th{font-size:9px;padding:6px 6px}
-  .answers-table td{padding:7px 6px;font-size:10px}
-  .metrics-table{font-size:10px}
-  .metrics-table th{font-size:9px}
-  #halykFab{width:52px;height:52px;right:12px;bottom:12px;font-size:20px;bottom:max(12px, env(safe-area-inset-bottom))}
+  .header{padding:0 12px;gap:8px;height:52px}
+  .brand-text p{display:none}
+  .brand-text h1{font-size:13px}
+  .header-center{display:none}
+  .header-actions .btn span.label{display:none}
+  .layout{grid-template-columns:1fr;height:auto;min-height:calc(100vh - 52px)}
+  .chat-pane{border-right:none;min-height:60vh}
+  .artifacts-pane{border-top:1px solid var(--border)}
+  .chat-history{padding:14px 12px}
+  .msg{max-width:94%}
+  .msg.user{max-width:86%}
 }
 @media(max-width:640px){
-  .halyk-title h1{font-size:13px}
-  .halyk-title p{-webkit-line-clamp:1}
-  .controls{flex-direction:column;align-items:stretch;gap:8px}
-  .controls button{width:100%;min-height:48px;justify-content:center;font-size:13px}
-  .controls div[style*="margin-left:auto"]{margin-left:0!important;width:100%}
-  .controls div[style*="margin-left:auto"] button{width:100%}
-  .score-big{font-size:32px;line-height:1}
-  .score-detail{font-size:11px}
-  .stat-grid{grid-template-columns:repeat(2,1fr);gap:8px}
-  .stat-item{padding:12px 8px}
-  .stat-value{font-size:20px}
-  .stat-label{font-size:8px;letter-spacing:0.04em}
-  .chip{font-size:10px;padding:4px 8px;min-height:24px;display:inline-flex;align-items:center}
-  button{min-height:44px;font-size:13px}
-  .btn-small{min-height:36px;padding:6px 12px;font-size:11px}
-  .answers-table th, .answers-table td{padding:6px 6px;font-size:10px;line-height:1.3}
-  .answers-table td{word-break:break-word}
-  /* таблицы — горизонтальный скролл с индикатором */
-  .card div[style*="overflow:auto"]{margin:0 -14px;padding:0 14px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;position:relative}
-  .card div[style*="overflow:auto"]::-webkit-scrollbar{height:4px}
-  .card div[style*="overflow:auto"]::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-  .answers-table{ min-width:640px; border-collapse:separate; border-spacing:0}
-  .answers-table th{position:sticky;top:0;background:var(--surface);z-index:2}
-  .answers-table td:first-child, .answers-table th:first-child{position:sticky;left:0;background:var(--surface);z-index:3;border-right:1px solid var(--border);min-width:56px}
-  .answers-table th:first-child{z-index:4}
-  .metrics-table{ min-width:520px }
-  .metrics-table th{position:sticky;top:0;background:var(--surface2);z-index:2}
-  .modal{margin:0;max-width:none;width:100%;border-radius:16px 16px 0 0;padding:16px;max-height:92vh;display:flex;flex-direction:column}
-  .modal h2{font-size:16px;margin-bottom:8px}
-  .modal p{font-size:12px;margin-bottom:12px}
-  .modal-overlay{align-items:flex-end;padding:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px)}
-  .modal-overlay .modal{border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:88vh;max-height:88dvh}
-  #chatHistory, #globalChatHistory{height:48vh!important; max-height:48vh; min-height:200px}
-  .toast{left:12px;right:12px;bottom:12px;max-width:none;text-align:center;padding:14px 16px;font-size:13px;bottom:max(12px, env(safe-area-inset-bottom))}
-  input[type="text"],input[type="password"],textarea,select{font-size:16px !important; padding:12px 14px; min-height:44px} /* iOS не зумит */
-  textarea{ min-height:80px}
-  select{ min-height:44px}
-  .toggle{width:44px;height:26px}
-  .toggle .slider::before{width:20px;height:20px}
-  .progress-bar{height:8px}
-  .progress-text{font-size:11px}
-}
-@media(max-width:380px){
-  header{padding:10px 12px}
-  .halyk-logo{width:32px;height:32px;font-size:14px}
-  .halyk-title h1{font-size:12px}
-  .tabs{padding:2px;gap:2px}
-  .tab{padding:8px 10px;font-size:11px;min-height:36px}
-  .score-big{font-size:28px}
-  .halyk-title p{display:none}
-  .stat-value{font-size:18px}
-  #halykFab{width:48px;height:48px;right:10px;bottom:10px;font-size:18px}
-}
-@media(max-width:320px){
-  .header-right{gap:4px}
-  .model-badge{font-size:9px;padding:4px 6px}
-  #statusBadge{font-size:9px;padding:4px 8px}
-  .card{padding:12px}
-}
-/* Touch & hover refinement — BigTech */
-@media(hover:none) and (pointer:coarse){
-  button:active{transform:scale(0.97);transition:transform 0.1s}
-  .tab:active{transform:scale(0.97)}
-  .card:active{transform:none}
-  .answers-table tr:hover{background:transparent}
-  .answers-table tr:active{background:var(--surface2)}
-  .provider-card:active{transform:scale(0.98)}
-  *{-webkit-tap-highlight-color: transparent}
-}
-/* safe area для iPhone + Dynamic Viewport */
-@supports(padding:max(0px)){
-  body{padding-left:max(0px, env(safe-area-inset-left)); padding-right:max(0px, env(safe-area-inset-right))}
-  .toast{padding-bottom:max(12px, env(safe-area-inset-bottom))}
-  #halykFab{bottom:max(16px, env(safe-area-inset-bottom)); right:max(16px, env(safe-area-inset-right))}
-  header{padding-top:max(12px, env(safe-area-inset-top))}
-}
-@supports(height:100dvh){
-  .modal-overlay{height:100dvh}
-  .modal{max-height:88dvh}
+  .header{height:50px}
+  .brand-logo{width:32px;height:32px;font-size:12px}
+  .chat-input-wrap{padding:10px 12px}
+  .data-grid{grid-template-columns:1fr 1fr}
 }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.1/dist/mermaid.min.js"></script>
-<script>mermaid.initialize({startOnLoad:false, theme:'dark'})</script>
 </head>
 <body>
-<header>
-  <div class="halyk-brand">
-    <div class="halyk-logo">HB</div>
-    <div class="halyk-title">
+<header class="header">
+  <div class="brand">
+    <div class="brand-logo">HB</div>
+    <div class="brand-text">
       <h1>Halyk Bank — <span>Covenant Agent</span></h1>
-      <p>AI-аналитика ковенантов • честные результаты • воспроизводимость</p>
+      <p>halyk.wit.kz • AI-аналитика ковенантов • 12 сценариев × 3 ковенанта</p>
     </div>
   </div>
-  <div class="header-right">
-    <div class="model-badge" title="Основная модель + Vision fallback">⚡ muse-spark-1.2-contributor <small>основная</small></div>
-    <div class="model-badge" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" title="Vision для сканированных финотчётов">👁️ Gemini Vision <small>fallback</small></div>
-    <div id="statusBadge" class="status-badge status-idle">IDLE</div>
+  <div class="header-center">
+    <div class="model-pill"><span class="model-dot"></span> <b>muse-spark-1.2</b> <span class="muted">primary</span></div>
+    <div class="model-pill" style="opacity:.7">👁️ Gemini Vision <span class="muted">fallback</span></div>
+    <div id="statusPill" class="status-pill status-idle">IDLE</div>
+  </div>
+  <div class="header-actions">
+    <input type="file" id="zipInput" accept=".zip" style="display:none">
+    <button class="btn btn-ghost" onclick="triggerUpload()"><span>📁</span> <span class="label">ZIP</span></button>
+    <button class="btn btn-secondary" id="btnRun" onclick="runAgent()"><span id="runIcon">▶</span> <span class="label">Запустить</span></button>
+    <button class="btn btn-ghost" onclick="downloadSubmission()">⬇ <span class="label">Скачать</span></button>
+    <button class="btn-icon" onclick="openSettings()" title="Настройки">⚙️</button>
   </div>
 </header>
 
-<div class="tabs-wrap">
-  <div class="tabs" id="tabs">
-    <div class="tab active" data-tab="agent">⚡ Агент</div>
-    <div class="tab" data-tab="results">📊 Результаты</div>
-    <div class="tab" data-tab="metrics">📈 Метрики</div>
-    <div class="tab" data-tab="logs">📝 Логи</div>
-  </div>
-</div>
-
-<!-- AGENT -->
-<div class="tab-content active" id="tab-agent">
-  <div class="container">
-    <div class="card full-width">
-      <div class="honest-banner">
-        <div class="icon">✓</div>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:700"><b>Честный режим + Расширенный пайплайн:</b> результаты считаются только локальным evaluator’ом. <b>muse-spark-1.2-contributor</b> — основная, <b>Gemini Vision</b> — fallback для сканированных таблиц.</div>
-          <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Все ответы — вывод агента через инструменты. Evidence = null означает отсутствие единственной спорной транзакции. Проблемные P3/P4/P5/P6/P9 проходят двухпроходную верификацию.</div>
+<div class="layout">
+  <!-- LEFT: Chat -->
+  <section class="chat-pane">
+    <div class="pipeline-strip" id="pipelineStrip">
+      <div class="step-chip" data-step="1"><span class="step-num">1</span> Архив</div><span class="step-arrow">›</span>
+      <div class="step-chip" data-step="2"><span class="step-num">2</span> Документы</div><span class="step-arrow">›</span>
+      <div class="step-chip" data-step="3"><span class="step-num">3</span> Факты</div><span class="step-arrow">›</span>
+      <div class="step-chip" data-step="4"><span class="step-num">4</span> Связи</div><span class="step-arrow">›</span>
+      <div class="step-chip" data-step="5"><span class="step-num">5</span> Расчёт</div><span class="step-arrow">›</span>
+      <div class="step-chip" data-step="6"><span class="step-num">6</span> Ответ</div>
+    </div>
+    <div class="progress-wrap"><div id="progressBar" class="progress-bar"></div></div>
+    <div id="chatHistory" class="chat-history">
+      <div class="empty-chat" id="emptyChat">
+        <div class="empty-icon">🤖</div>
+        <h3>Halyk Covenant Agent готов</h3>
+        <p>Агент проходит 6 шагов: от архива с документами до обоснованного ответа с доказательствами. Загрузи ZIP или нажми «Запустить» — покажу каждый шаг в этом чате, а справа соберу артефакты.</p>
+        <div class="empty-actions">
+          <button class="btn btn-primary" onclick="runAgent()">▶ Запустить все 12 сценариев</button>
+          <button class="btn btn-secondary" onclick="runAgent(['P1','P2','P3'])">Быстрый тест P1–P3</button>
+          <button class="btn btn-ghost" onclick="triggerUpload()">📁 Загрузить ZIP</button>
         </div>
-        <span class="chip on">● muse-spark + Vision</span>
+        <div style="margin-top:10px;font-size:11px;color:var(--text-faint)">Подсказки: «запусти P6» • «что с ковенантом 6.1 у P3?» • «покажи транзакцию TXN-P6-0040»</div>
       </div>
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-        <span style="font-size:11px;font-weight:700;color:var(--text)">Расширенный пайплайн:</span>
-        <span class="chip on">1. PyMuPDF → Gemini Vision (если <1200 симв. или нет цифр)</span>
-        <span class="chip">2. Классификация → индекс</span>
-        <span class="chip">3. ReAct агент (muse-spark)</span>
-        <span class="chip" style="background:var(--accent-dim);color:var(--accent);border-color:#1DB95444">4. Верификация P3/P4/P5/P6/P9</span>
-        <span class="chip">5. Компиляция submission.json</span>
-        <span style="margin-left:auto;font-size:11px;color:var(--warning)">P6 ловушка: соцналог исключён ✓</span>
+    </div>
+    <div class="chat-input-wrap">
+      <div class="input-row">
+        <textarea id="chatInput" class="chat-input" rows="1" placeholder="Спроси агента или дай команду: запусти P6, покажи расчёт, что с B1?"></textarea>
+        <button class="btn btn-primary" id="btnSend" onclick="sendMessage()" style="height:44px;min-width:88px">Отправить</button>
       </div>
-      <div class="card-title"><span class="dot"></span> Управление анализом ковенантов</div>
-      <div class="controls">
-        <button class="btn-primary" id="btnRunAll" onclick="runAgent()"> <span id="runAllIcon">▶</span> Запустить все сценарии</button>
-        <button class="btn-secondary" id="btnRunP1" onclick="runAgent(['P1','P2','P3'])">▶ Быстрый тест (P1–P3)</button>
-        <button class="btn-secondary" onclick="refreshAll()">🔄 Обновить</button>
-        <button class="btn-ghost" onclick="evaluate()">🧪 Пересчитать оценку</button>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
-          <input type="file" id="datasetUpload" accept=".zip" style="display:none" onchange="uploadDataset(this.files[0])">
-          <button class="btn-secondary" id="btnUpload" onclick="document.getElementById('datasetUpload').click()"><span id="uploadIcon">📁</span> Загрузить ZIP</button>
+      <div class="input-hint">
+        <span>Быстрые команды:</span>
+        <span class="hint-chip" onclick="quickPrompt('запусти P6')">запусти P6</span>
+        <span class="hint-chip" onclick="quickPrompt('запусти все')">запусти все</span>
+        <span class="hint-chip" onclick="quickPrompt('покажи нарушения')">покажи нарушения</span>
+        <span class="hint-chip" onclick="quickPrompt('объясни P6.6.2')">объясни P6.6.2</span>
+        <span class="hint-chip" onclick="quickPrompt('скачай submission')">скачай submission</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: Artifacts -->
+  <aside class="artifacts-pane">
+    <!-- Workflow -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><span class="dot"></span> Рабочий процесс агента</div>
+        <span id="workflowStatus" class="small muted">ожидание</span>
+      </div>
+      <div class="pipeline-vertical" id="pipelineVertical">
+        <div class="pv-step" data-pv="1">
+          <div class="pv-icon">📦</div>
+          <div class="pv-content">
+            <div class="pv-title">1. Получает архив</div>
+            <div class="pv-desc">ZIP с документами + реестр <code>master_ledger_2025.csv</code></div>
+            <div class="pv-status">ожидание</div>
+          </div>
+        </div>
+        <div class="pv-step" data-pv="2">
+          <div class="pv-icon">🔍</div>
+          <div class="pv-content">
+            <div class="pv-title">2. Находит релевантные документы</div>
+            <div class="pv-desc">Классификация PDF по <code>account_id → scenario_id</code></div>
+            <div class="pv-status">ожидание</div>
+          </div>
+        </div>
+        <div class="pv-step" data-pv="3">
+          <div class="pv-icon">📄</div>
+          <div class="pv-content">
+            <div class="pv-title">3. Извлекает факты</div>
+            <div class="pv-desc">PyMuPDF → Gemini Vision (если &lt;1200 симв.) → текст/таблицы ковенантов</div>
+            <div class="pv-status">ожидание</div>
+          </div>
+        </div>
+        <div class="pv-step" data-pv="4">
+          <div class="pv-icon">🔗</div>
+          <div class="pv-content">
+            <div class="pv-title">4. Строит связи</div>
+            <div class="pv-desc">Документы ↔ транзакции <code>txn_id = TXN-{scenario}-*</code></div>
+            <div class="pv-status">ожидание</div>
+          </div>
+        </div>
+        <div class="pv-step" data-pv="5">
+          <div class="pv-icon">🧮</div>
+          <div class="pv-content">
+            <div class="pv-title">5. Рассчитывает показатели</div>
+            <div class="pv-desc">Коэффициенты и суммы в USD, верификация P3/P4/P5/P6/P9</div>
+            <div class="pv-status">ожидание</div>
+          </div>
+        </div>
+        <div class="pv-step" data-pv="6">
+          <div class="pv-icon">✅</div>
+          <div class="pv-content">
+            <div class="pv-title">6. Формирует ответ с доказательствами</div>
+            <div class="pv-desc"><code>submission.json</code> с reasoning и <code>evidence_txn_id</code></div>
+            <div class="pv-status">ожидание</div>
+          </div>
         </div>
       </div>
-      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-      <div class="progress-text" id="progressText">Система готова. Нажми «Запустить» — агент прочитает документы и заполнит 36 ячеек.</div>
     </div>
-    <div class="card">
-      <div class="card-title"><span class="dot" style="background:var(--blue)"></span> Оценка точности</div>
-      <div class="score-big" id="scoreValue">—</div>
-      <div class="score-detail" id="scoreDetail">Ожидание завершения работы агента…</div>
-      <div style="display:flex;gap:8px;margin-top:14px;justify-content:center">
-        <span class="chip">status 0.50</span><span class="chip">actual 0.30</span><span class="chip">evidence 0.20</span>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="dot" style="background:var(--warning)"></span> Статистика выполнения</div>
-      <div class="stats-grid" style="margin-top:6px">
-        <div class="stat-item"><div class="stat-value" id="statFilled">0</div><div class="stat-label">Проверено ячеек</div></div>
-        <div class="stat-item"><div class="stat-value" id="statBreach" style="color:var(--breach)">0</div><div class="stat-label">Нарушений</div></div>
-        <div class="stat-item"><div class="stat-value" id="statCompliant" style="color:var(--compliant)">0</div><div class="stat-label">Соблюдено</div></div>
-        <div class="stat-item"><div class="stat-value" id="statTotal">36</div><div class="stat-label">Всего ячеек</div></div>
-      </div>
-      <div style="margin-top:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;gap:8px;align-items:center">
-        <span style="font-size:11px;color:var(--text-dim)">Активный провайдер:</span><span class="chip on">muse-spark-1.2-contributor</span>
-        <span style="margin-left:auto;font-size:11px;color:var(--text-dim)" id="lastRunInfo">нет запусков</span>
-      </div>
-    </div>
-  </div>
-</div>
 
-<!-- RESULTS -->
-<div class="tab-content" id="tab-results">
-  <div class="container">
-    <div class="card full-width">
-      <div class="card-title"><span class="dot"></span> Выводы агента и бизнес-обоснования</div>
-      <p style="color:var(--text-dim);font-size:12px;margin-bottom:14px">Таблица 12 сценариев × 3 ковенанта. Разверни строку, чтобы увидеть reasoning и Mermaid-граф логики. Evidence null — честный вывод, когда нет единственной транзакции-улики.</p>
-      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-        <button class="btn-secondary" onclick="evaluate()">📊 Сверка с эталоном</button>
-        <a href="/api/submission" target="_blank" style="text-decoration:none"><button class="btn-secondary">📄 submission.json</button></a>
-        <a href="/api/download_submission" target="_blank" style="text-decoration:none"><button class="btn-primary" style="margin-left:auto">💾 Скачать ZIP для отправки</button></a>
+    <!-- Data + Score -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><span class="dot" style="background:var(--blue)"></span> Данные и оценка</div>
+        <button class="btn btn-ghost" style="padding:4px 8px;font-size:11px" onclick="refreshAll()">↻ Обновить</button>
+      </div>
+      <div class="upload-drop" id="dropZone" onclick="triggerUpload()">
+        <div class="upload-icon">📁</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700">Датасет</div>
+          <div id="datasetInfo" class="small muted" style="margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">agentic-bank-public • перетащи ZIP сюда или кликни</div>
+        </div>
+        <span class="small muted">ZIP ≤50MB</span>
+      </div>
+      <div class="data-grid" style="margin-top:12px">
+        <div class="data-item"><div class="data-value" id="statDocs">—</div><div class="data-label">Документов</div></div>
+        <div class="data-item"><div class="data-value" id="statTxns">—</div><div class="data-label">Транзакций</div></div>
+        <div class="data-item"><div class="data-value" id="statScenarios">12</div><div class="data-label">Сценариев</div></div>
+        <div class="data-item"><div class="data-value" id="statCells">0/36</div><div class="data-label">Ячеек</div></div>
+      </div>
+      <div class="divider"></div>
+      <div class="score-row">
+        <div class="score-value" id="scoreValue">—</div>
+        <div class="score-info">
+          <div class="score-label">Weighted score</div>
+          <div class="score-sub" id="scoreSub">запусти агента для расчёта</div>
+        </div>
+        <button class="btn btn-secondary" onclick="evaluate()" style="padding:6px 10px;font-size:11px">Пересчитать</button>
+      </div>
+      <div class="weights">
+        <span class="weight-chip"><b>0.50</b> статус</span>
+        <span class="weight-chip"><b>0.30</b> actual</span>
+        <span class="weight-chip"><b>0.20</b> evidence</span>
+      </div>
+      <div id="evalDetails" class="small muted" style="margin-top:8px;line-height:1.5"></div>
+    </div>
+
+    <!-- Criteria -->
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--warning)"></span> Критерии оценки</div>
+      <div class="format-list">
+        <div class="format-item"><div class="format-icon">✓</div><div><h4>Корректность решения</h4><p>Вердикт COMPLIANT/BREACH • вес 0.50, ошибка = 0 за ячейку</p></div></div>
+        <div class="format-item"><div class="format-icon">🧮</div><div><h4>Точность вычислений</h4><p><code>actual</code> по шкале: 0% ошибка=0.30, 2.5%=0.15, ≥5%=0</p></div></div>
+        <div class="format-item"><div class="format-icon">🔗</div><div><h4>Подтверждение доказательствами</h4><p><code>evidence_txn_id</code> — если указана, точный txn; если null — следует шкале actual</p></div></div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card" id="resultsCard">
+      <div class="card-head">
+        <div class="card-title"><span class="dot"></span> Результаты • 36 ячеек</div>
+        <span class="small muted" id="resultsMeta">нет данных</span>
       </div>
       <div style="overflow:auto;border:1px solid var(--border);border-radius:10px">
-        <table class="answers-table">
-          <thead><tr>
-            <th>Сценарий</th><th>6.1 статус</th><th>actual</th><th>evidence</th><th>6.2 статус</th><th>actual</th><th>evidence</th><th>6.3 статус</th><th>actual</th><th>evidence</th>
-          </tr></thead>
-          <tbody id="answersBody"></tbody>
+        <table class="results-table">
+          <thead><tr><th>Сценарий</th><th>6.1</th><th>6.2</th><th>6.3</th></tr></thead>
+          <tbody id="resultsBody"><tr><td colspan="4" style="text-align:center;padding:16px;color:var(--text-faint)">Нет данных — запусти агента</td></tr></tbody>
         </table>
       </div>
-      <div id="evalResults" style="margin-top:18px"></div>
+      <div id="resultsReasoning" style="margin-top:10px;display:none">
+        <div class="small muted" style="margin-bottom:6px;font-weight:700;letter-spacing:.04em;text-transform:uppercase">Комментарий агента</div>
+        <div id="reasoningContent" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;line-height:1.6;color:var(--text-dim);white-space:pre-wrap"></div>
+      </div>
     </div>
-  </div>
-</div>
 
-<!-- METRICS -->
-<div class="tab-content" id="tab-metrics">
-  <div class="container">
-    <div class="card full-width">
-      <div class="card-title"><span class="dot" style="background:var(--accent)"></span> Честные замеры — сравнение моделей и история запусков</div>
-      <p style="color:var(--text-dim);font-size:12px;margin-bottom:14px">Источник правды — локальный evaluator (кейс Halyk). История хранится в cache/history.json и переживает перезапуски. Рекомендуемая модель выделена.</p>
-      <div style="overflow:auto;border:1px solid var(--border);border-radius:10px">
-        <table class="metrics-table">
-          <thead><tr><th>Время</th><th>Инициатор</th><th>Модель</th><th>Сценарии</th><th>Время (с)</th><th>Точность</th></tr></thead>
-          <tbody id="metricsBody"></tbody>
-        </table>
+    <!-- Format & Deliverables -->
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--compliant)"></span> Формат ответа</div>
+      <p class="small muted" style="margin:6px 0 10px;line-height:1.6">По каждому ковенанту каждого заёмщика — 3 компонента. Структура строго по <code>submission_template.json</code>.</p>
+      <div class="submission-preview">
+        <div class="preview-head">
+          <span>submission.json</span>
+          <span style="display:flex;gap:6px">
+            <button class="btn btn-secondary" style="padding:4px 8px;font-size:11px" onclick="copySubmission()">Копировать</button>
+            <button class="btn btn-primary" style="padding:4px 8px;font-size:11px" onclick="downloadSubmission()">Скачать ZIP</button>
+          </span>
+        </div>
+        <div class="preview-code" id="previewCode">{
+  "team": "wit.kz",
+  "contact_email": "info@wit.kz",
+  "model": "muse-spark-1.2-contributor",
+  "answers": {
+    "P1": {
+      "6.1": { "status": "COMPLIANT", "actual": 1.68, "evidence_txn_id": null },
+      "6.2": { "status": "BREACH", "actual": 5400000.00, "evidence_txn_id": null }
+    }
+  }
+}</div>
       </div>
-      <div style="margin-top:14px;display:flex;gap:8px">
-        <button class="btn-secondary btn-small" onclick="loadMetrics()">🔄 Обновить таблицу</button>
-        <span style="font-size:11px;color:var(--text-dim);align-self:center">Показатель «Точность» = weighted score (status 0.5 / actual 0.3 / evidence 0.2). Честно — без ручной правки ответов.</span>
+      <div class="format-list">
+        <div class="format-item"><div class="format-icon">①</div><div><h4>Вердикт — status</h4><p><code>COMPLIANT</code> или <code>BREACH</code> • заглавными</p></div></div>
+        <div class="format-item"><div class="format-icon">②</div><div><h4>Число — actual</h4><p>Положительное, USD или коэффициент • 2 знака после запятой</p></div></div>
+        <div class="format-item"><div class="format-icon">③</div><div><h4>Транзакция-улика — evidence_txn_id</h4><p>Единственная спорная <code>TXN-*</code> или <code>null</code> (коэффициенты/агрегаты)</p></div></div>
+      </div>
+      <div class="divider"></div>
+      <div class="small muted" style="font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Что необходимо сдать</div>
+      <div class="deliverables">
+        <div class="deliverable"><span>📄</span><div><b>1. submission.json</b><div class="small muted">По шаблону, 36 ячеек • скачай справа</div></div></div>
+        <div class="deliverable"><span>💻</span><div><b>2. GitHub-репозиторий</b><div class="small muted">Код агента • воспроизводимость</div></div></div>
+        <div class="deliverable"><span>📖</span><div><b>3. README</b><div class="small muted">Как запустить • <code>docker compose up</code></div></div></div>
       </div>
     </div>
-  </div>
-</div>
 
-<!-- LOGS -->
-<div class="tab-content" id="tab-logs">
-  <div class="container">
-    <div class="card full-width">
-      <div class="card-title"><span class="dot"></span> Логи агента (real-time)</div>
-      <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button class="btn-danger btn-small" onclick="clearCache()">🗑️ Очистить кэш</button>
-        <span style="font-size:11px;color:var(--text-dim);align-self:center">Кэш: extracted_texts.json + document_index.json — без очистки агент использует кэш для скорости.</span>
-      </div>
-      <div class="log-container" id="logContainer"></div>
-    </div>
+    <div class="small muted" style="text-align:center;padding:8px 0 4px">Halyk Bank • halyk.wit.kz • muse-spark + Gemini Vision • <a href="/health" target="_blank">health</a> • <a href="/metrics" target="_blank">metrics</a></div>
   </div>
+</aside>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<!-- Edit Modal -->
-<div class="modal-overlay" id="editModal">
+<!-- Settings modal -->
+<div class="modal-overlay" id="settingsModal">
   <div class="modal">
-    <h2>✏️ Редактирование ответа</h2>
-    <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px">Сценарий <strong id="editScenarioId" style="color:var(--text)"></strong> · Ковенант <strong id="editCovenantId" style="color:var(--text)"></strong></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-      <div><label style="font-size:11px;color:var(--text-dim)">Статус</label><select id="editStatus"><option value="COMPLIANT">COMPLIANT</option><option value="BREACH">BREACH</option></select></div>
-      <div><label style="font-size:11px;color:var(--text-dim)">Actual</label><input type="number" step="0.01" id="editActual"/></div>
+    <h2>⚙️ Настройки</h2>
+    <p>ADMIN_TOKEN защищает /api/run и /api/upload. Если задан в .env — введи его здесь (сохранится в браузере). Провайдер — muse-spark primary, Gemini Vision fallback.</p>
+    <label class="small muted" style="display:block;margin-bottom:4px">Admin Token (X-Admin-Token)</label>
+    <input type="password" id="adminTokenInput" placeholder="вставь ADMIN_TOKEN или оставь пустым если не задан">
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-secondary" onclick="saveSettings()">💾 Сохранить</button>
+      <button class="btn btn-ghost" onclick="clearSettings()">Очистить</button>
+      <button class="btn btn-ghost" style="margin-left:auto" onclick="closeSettings()">Закрыть</button>
     </div>
-    <div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-dim)">Обоснование (reasoning)</label><textarea id="editReasoning" rows="4"></textarea></div>
-    <div id="evidenceContainer" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;display:none">
-      <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:6px">🧾 Доказательство (транзакция)</div>
-      <div id="evidenceContent" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">Загрузка…</div>
-    </div>
-    <div class="modal-buttons">
-      <button class="btn-secondary" onclick="document.getElementById('editModal').style.display='none'">Отмена</button>
-      <button class="btn-primary" onclick="saveEdit()">Сохранить</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="hitlModal">
-  <div class="modal">
-    <h2>⚠️ Требуется решение аналитика</h2>
-    <p id="hitlQuestion"></p>
-    <input type="text" id="hitlInput" placeholder="Введите ответ (например: Исключить)"/>
-    <div class="modal-buttons" style="margin-top:16px"><button class="btn-primary" onclick="resolveHitl()">Отправить агенту</button></div>
-  </div>
-</div>
-
-<!-- Floating Halyk AI — глобальный чат (был потерян при редизайне, возвращён) -->
-<button id="halykFab" onclick="openGlobalChat()" style="position:fixed;right:16px;bottom:16px;z-index:900;width:56px;height:56px;border-radius:50%;background:var(--accent);color:#062015;border:none;box-shadow:0 8px 24px #00000044;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center">💬</button>
-<div class="modal-overlay" id="globalChatModal">
-  <div class="modal" style="max-width:640px">
-    <h2>🤖 Halyk AI — главный копilot</h2>
-    <p style="font-size:11px;color:var(--text-dim)">Спроси про любой сценарий, попроси запустить анализ или сменить модель. Пиши: <code>запусти P6</code> или <code>смени на deepseek</code>.</p>
-    <div id="globalChatHistory" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.6"><div style="color:var(--text-dim);text-align:center;margin-top:90px">Привет! Я Halyk AI. Чем помочь?</div></div>
-    <div style="display:flex;gap:8px;margin-top:12px"><input type="text" id="globalChatInput" placeholder="Напиши: запусти P6, смени модель, что с ковенантом?" style="margin:0;flex:1" onkeypress="if(event.key==='Enter')sendGlobalChat()"/><button class="btn-primary" onclick="sendGlobalChat()" id="btnGlobalSend">Отправить</button></div>
-    <div class="modal-buttons" style="margin-top:12px"><button class="btn-secondary" onclick="document.getElementById('globalChatModal').style.display='none'">Закрыть</button></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="chatModal">
-  <div class="modal" style="max-width:640px">
-    <h2>💬 Halyk AI — обсуждение ковенанта</h2>
-    <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px">Сценарий <strong id="chatScenarioId" style="color:var(--text)"></strong> · Ковенант <strong id="chatCovenantId" style="color:var(--text)"></strong></div>
-    <div id="chatHistory" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.6"><div style="color:var(--text-dim);text-align:center;margin-top:90px">Задай вопрос по расчёту — объясню логику без технарщины.</div></div>
-    <div style="display:flex;gap:8px;margin-top:12px"><input type="text" id="chatInput" placeholder="Твой вопрос…" style="margin:0;flex:1" onkeypress="if(event.key==='Enter')sendChatMessage()"/><button class="btn-primary" onclick="sendChatMessage()" id="btnSendChat">Отправить</button></div>
-    <div class="modal-buttons" style="margin-top:12px"><button class="btn-secondary" onclick="document.getElementById('chatModal').style.display='none'">Закрыть</button></div>
+    <div class="divider"></div>
+    <div class="small muted">Провайдеры: ключ muse-spark хранится в .env (MUSE_SPARK_API_KEY) или cache/providers.json. Для хакатона достаточно env.</div>
+    <div id="providersMini" class="small muted" style="margin-top:8px"></div>
   </div>
 </div>
 
 <script>
 const SCENARIOS=['P1','P2','P3','P4','P5','P6','P7','P8','P9','P10','B1','B4'];
-let ws=null,isAgentRunning=false;
+let isRunning=false;
+let ws=null;
+let answersCache={};
 
-// Tabs — fixed (no global event)
-document.querySelectorAll('.tab').forEach(el=>{
-  el.addEventListener('click',()=>{
-    const name=el.dataset.tab;
-    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById('tab-'+name).classList.add('active');
-    if(name==='metrics') loadMetrics();
-  });
-});
-function showToast(msg,type='success'){
-  const t=document.getElementById('toast');t.textContent=msg;t.className='toast '+type;t.style.display='block';setTimeout(()=>t.style.display='none',3200);
-}
-function connectWS(){
-  const proto=location.protocol==='https:'?'wss':'ws';
-  ws=new WebSocket(`${proto}://${location.host}/ws/logs`);
-  ws.onmessage=e=>{
-    const el=document.getElementById('logContainer');const div=document.createElement('div');div.textContent=e.data;el.appendChild(div);el.scrollTop=el.scrollHeight;
-  };
-  ws.onclose=()=>setTimeout(connectWS,2000);
-}
-connectWS();
-async function loadMetrics(){
-  const r=await fetch('/api/metrics');const data=await r.json();const tbody=document.getElementById('metricsBody');
-  let html='';
-  if(data.history && Array.isArray(data.history) && data.history.length){
-    [...data.history].reverse().forEach(run=>{
-      const date=new Date(run.timestamp).toLocaleString('ru-RU');
-      const isSpark=(run.model||'').includes('muse-spark');
-      html+=`<tr style="${isSpark?'background:var(--accent-dim)':''}">
-        <td>${date}</td><td>${run.initiator||'Система'}</td>
-        <td><strong style="color:${isSpark?'var(--accent)':'var(--text)'}">${run.model||'—'}</strong>${isSpark?' <span class="chip on" style="font-size:10px">muse-spark</span>':''}</td>
-        <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${(run.scenarios||[]).join(', ')}</td>
-        <td>${(run.duration_sec||0).toFixed(1)} с</td>
-        <td><strong style="color:var(--accent)">${run.accuracy||'0%'}</strong> <span style="color:var(--text-dim)">(${run.correct||0}/${run.total||0})</span></td>
-      </tr>`;
-    });
-  }
-  if(!html) html=`<tr><td colspan="6" style="text-align:center;color:var(--text-dim)">Нет истории запусков — запусти агента, чтобы увидеть честные замеры.</td></tr>`;
-  tbody.innerHTML=html;
-  if(data.history && data.history.length){
-    const last=data.history[data.history.length-1];
-    document.getElementById('lastRunInfo').textContent=`посл. запуск: ${new Date(last.timestamp).toLocaleString('ru-RU')} · ${last.model} · ${last.accuracy}`;
-  }
-}
-async function loadProviders(){
-  const r=await fetch('/api/providers');const providers=await r.json();const grid=document.getElementById('providerGrid');grid.innerHTML='';
-  for(const [pid,cfg] of Object.entries(providers)){
-    const isActive=cfg.enabled && cfg.api_key_set;
-    const isSpark=pid==='muse_spark';
-    const card=document.createElement('div');
-    card.className='provider-card'+(isActive?' active':'')+(isSpark?' recommended':'');
-    const cancelBtn = `<button class="btn-secondary btn-small" onclick="clearKey('${pid}')" title="Очистить ключ и отключить" style="${cfg.api_key_set?'':'opacity:0.5'}">✖ Отмена</button>`;
-    card.innerHTML=`
-      <div class="p-header"><div><div class="p-name">${cfg.name} ${isSpark?'⭐':''}</div><div class="p-model">${cfg.models.fast}</div></div>
-        <label class="toggle"><input type="checkbox" ${cfg.enabled?'checked':''} onchange="toggleProvider('${pid}',this.checked)"><span class="slider"></span></label>
-      </div>
-      <input type="password" id="key-${pid}" placeholder="API Key" value="${cfg.api_key_set?cfg.api_key_masked:''}" onfocus="if(this.value.includes('...'))this.value=''" autocomplete="off" spellcheck="false">
-      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn-secondary btn-small" onclick="saveKey('${pid}')">💾 Сохранить</button><button class="btn-secondary btn-small" onclick="testProvider('${pid}')">🧪 Тест</button>${cancelBtn}</div>
-      <div class="p-status ${isActive?'p-status-on':'p-status-off'}" style="margin-top:8px;display:inline-block">${isActive?'● Активен':'○ Неактивен'}</div>
-      ${isSpark?'<div style="margin-top:8px;font-size:11px;color:var(--accent)">Основная модель Halyk — выбрана по замерам</div>':''}
-    `;
-    grid.appendChild(card);
-  }
-}
-async function saveKey(pid){
-  const el=document.getElementById('key-'+pid);
-  let key=el.value.trim();
-  if(!key || key.includes('...')) return showToast('Введи API ключ','error');
-  // Muse Spark ключи LLM_... часто с пробелами — чистим
-  if(key.length < 10) return showToast('Ключ слишком короткий','error');
-  const r=await fetch('/api/providers',{method:'POST',headers:{'Content-Type':'application/json',...adminHeaders()},body:JSON.stringify({provider_id:pid,api_key:key,enabled:true})});
-  const data=await r.json();
-  if(data.ok){
-    showToast('Ключ сохранён ✅ — проверяю...','success');
-    el.value=''; // очистим чтобы не светить ключ
-    await loadProviders();
-    // сразу тест чтобы показать точки или ошибку
-    setTimeout(()=>testProvider(pid), 400);
-  } else showToast('Ошибка: '+(data.error||'не сохранён'),'error');
-}
-async function clearKey(pid){
-  if(!confirm('Очистить ключ '+pid+' и отключить провайдера?')) return;
-  const r=await fetch('/api/providers',{method:'POST',headers:{'Content-Type':'application/json',...adminHeaders()},body:JSON.stringify({provider_id:pid,api_key:"",enabled:false})});
-  const data=await r.json();
-  if(data.ok){showToast('Ключ очищен','success');document.getElementById('key-'+pid).value='';loadProviders();}else showToast('Ошибка: '+data.error,'error');
-}
-async function toggleProvider(pid,enabled){
-  await fetch('/api/providers',{method:'POST',headers:{'Content-Type':'application/json',...adminHeaders()},body:JSON.stringify({provider_id:pid,enabled})});loadProviders();
-}
-async function testProvider(pid){
-  const key=document.getElementById('key-'+pid).value;showToast('Тестирую…','success');
-  const r=await fetch('/api/providers/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider_id:pid,api_key:key||undefined})});
-  const data=await r.json();showToast(data.message,data.ok?'success':'error');
-}
-async function runAgent(scenarios=null){
-  if(isAgentRunning) return;isAgentRunning=true;
-  document.getElementById('btnRunAll').disabled=true;document.getElementById('btnRunP1').disabled=true;
-  const icon=document.getElementById('runAllIcon');icon.className='loading-spinner';icon.textContent='';
-  showToast('Запуск анализа…','success');
-  const r = await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json',...adminHeaders()},body:JSON.stringify(scenarios?{scenarios}:{ })});
-  const data = await r.json().catch(()=>({}));
-  if(!r.ok){
-    showToast(data.error || 'Ошибка запуска', 'error');
-    isAgentRunning=false;
-    document.getElementById('btnRunAll').disabled=false;document.getElementById('btnRunP1').disabled=false;
-    icon.className='';icon.textContent='▶';
-    // подсветить провайдеры если ключ не задан
-    if((data.error||'').includes('Muse Spark')) {
-      showToast('Добавь MUSE_SPARK_API_KEY в .env и перезапусти: docker compose up -d','error');
-    }
-    return;
-  }
-  pollStatus();
-}
+// Helpers
 function adminHeaders(){
   const t=localStorage.getItem('admin_token')||'';
   return t?{'X-Admin-Token':t}:{};
 }
-async function refreshAll(){await refreshStatus();await refreshAnswers();}
-async function refreshStatus(){const r=await fetch('/api/status');const data=await r.json();updateStatus(data);}
-async function refreshAnswers(){const r=await fetch('/api/answers');const answers=await r.json();renderAnswers(answers);}
-async function evaluate(){
-  const r=await fetch('/api/evaluate');const data=await r.json();
-  if(data.error){document.getElementById('scoreValue').textContent='—';document.getElementById('scoreDetail').textContent=data.error;return;}
-  document.getElementById('scoreValue').textContent=data.percentage.toFixed(1)+'%';
-  document.getElementById('scoreDetail').textContent=`${data.total_score.toFixed(2)} / ${data.max_score.toFixed(2)} баллов · ${data.cells_scored} ячеек`;
-  let html=`<div class="card-title" style="margin-top:12px">Детализация (честная сверка)</div>
-  <div style="overflow:auto;border:1px solid var(--border);border-radius:10px"><table class="answers-table" style="background:var(--surface2)"><thead><tr>
-  <th>Проверка</th><th>Статус 0.5</th><th>Сумма 0.3</th><th>Док. 0.2</th><th>Итог</th><th>Примечание</th></tr></thead><tbody>`;
-  let has=false;
-  for(const [cell,score] of Object.entries(data.cells).sort()){
-    if(score.total===0 && score.details==="Cell missing") continue;
-    has=true;
-    const color=score.total>0.8?'var(--compliant)':score.total>0.4?'var(--warning)':'var(--breach)';
-    html+=`<tr><td><strong>${cell}</strong></td>
-      <td style="color:${score.status_score>0?'var(--compliant)':'var(--breach)'}">${score.status_score.toFixed(2)}</td>
-      <td style="color:${score.actual_score>0?'var(--compliant)':'var(--breach)'}">${score.actual_score.toFixed(2)}</td>
-      <td style="color:${score.evidence_score>0?'var(--compliant)':'var(--breach)'}">${score.evidence_score.toFixed(2)}</td>
-      <td style="color:${color};font-weight:700">${score.total.toFixed(2)}</td>
-      <td style="font-size:10px;color:var(--text-dim)">${score.details||'—'}</td></tr>`;
+function showToast(msg,type='success'){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className='toast '+type; el.style.display='block';
+  setTimeout(()=>el.style.display='none',3200);
+}
+function escapeHtml(s){
+  const m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
+  return String(s).replace(/[&<>"']/g,k=>m[k]);
+}
+function formatCurrency(v){
+  if(v==null||v==='') return '—';
+  return '$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function formatRatio(v){
+  if(v==null||v==='') return '—';
+  return Number(v).toFixed(2)+'x';
+}
+
+// Chat
+function appendMessage(role, html, meta=''){
+  const empty=document.getElementById('emptyChat');
+  if(empty) empty.style.display='none';
+  const wrap=document.getElementById('chatHistory');
+  const msg=document.createElement('div');
+  msg.className='msg '+role;
+  let bubbleClass='bubble';
+  msg.innerHTML=`<div class="${bubbleClass}">${html}</div>`+(meta?`<div class="msg-meta">${meta}</div>`:'');
+  wrap.appendChild(msg);
+  wrap.scrollTop=wrap.scrollHeight;
+}
+function appendSystem(text){
+  appendMessage('system', escapeHtml(text), new Date().toLocaleTimeString('ru-RU'));
+}
+function appendAgent(text){
+  // simple markdown: bold and line breaks
+  let html=escapeHtml(text).replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<b>$1</b>');
+  appendMessage('agent', html, 'Halyk Agent • '+new Date().toLocaleTimeString('ru-RU'));
+}
+function appendUser(text){
+  appendMessage('user', escapeHtml(text), 'Вы • '+new Date().toLocaleTimeString('ru-RU'));
+}
+
+// Pipeline UI
+function setPipelineStep(n, state){
+  // state: idle, running, done, error
+  const stripEl=document.querySelector(`.step-chip[data-step="${n}"]`);
+  if(stripEl){
+    stripEl.className='step-chip '+state;
   }
-  if(!has) html+=`<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--text-dim)">Нет данных — запусти агента</td></tr>`;
-  html+='</tbody></table></div>';
-  document.getElementById('evalResults').innerHTML=html;
-}
-async function clearCache(){if(!confirm('Очистить кэш?'))return;await fetch('/api/clear-cache',{method:'POST'});showToast('Кэш очищен 🗑️');}
-let hitlActive=false;
-function pollStatus(){
-  const interval=setInterval(async()=>{
-    const r=await fetch('/api/status');const data=await r.json();updateStatus(data);await refreshAnswers();
-    const h=await fetch('/api/hitl/pending');const hitl=await h.json();
-    if(hitl.pending && !hitlActive){hitlActive=true;document.getElementById('hitlModal').style.display='flex';document.getElementById('hitlQuestion').innerHTML=`<strong>Транзакция:</strong> ${hitl.transaction_id}<br><br>${hitl.question}`;}
-    if(data.state!=='running'){clearInterval(interval);isAgentRunning=false;hitlActive=false;document.getElementById('hitlModal').style.display='none';
-      document.getElementById('btnRunAll').disabled=false;document.getElementById('btnRunP1').disabled=false;const ic=document.getElementById('runAllIcon');ic.className='';ic.textContent='▶';
-      if(data.state==='done'){await evaluate();showToast('✅ Анализ завершён');document.querySelector('[data-tab="results"]').click();}
+  const pv=document.querySelector(`.pv-step[data-pv="${n}"]`);
+  if(pv){
+    pv.className='pv-step '+state;
+    const statusEl=pv.querySelector('.pv-status');
+    if(statusEl){
+      const labels={idle:'ожидание',running:'выполняется…',done:'готово ✓',error:'ошибка'};
+      statusEl.textContent=labels[state]||state;
     }
-  },2200);
+  }
 }
-async function resolveHitl(){
-  const decision=document.getElementById('hitlInput').value;if(!decision) return showToast('Введи ответ!','error');
-  await fetch('/api/hitl/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision})});
-  document.getElementById('hitlInput').value='';document.getElementById('hitlModal').style.display='none';hitlActive=false;showToast('Ответ отправлен');
-}
-let currentChatSid=null,currentChatCid=null;
-function openChatModal(sid,cid){
-  currentChatSid=sid;currentChatCid=cid;
-  document.getElementById('chatScenarioId').textContent=sid;document.getElementById('chatCovenantId').textContent=cid;
-  document.getElementById('chatHistory').innerHTML='<div style="color:var(--text-dim);text-align:center;margin-top:90px">Задай вопрос — объясню расчёт.</div>';
-  document.getElementById('chatInput').value='';document.getElementById('chatModal').style.display='flex';setTimeout(()=>document.getElementById('chatInput').focus(),90);
-}
-async function sendChatMessage(){
-  const inputEl=document.getElementById('chatInput'),btnEl=document.getElementById('btnSendChat'),historyEl=document.getElementById('chatHistory');
-  const message=inputEl.value.trim();if(!message) return;
-  if(historyEl.innerHTML.includes('Задай вопрос')) historyEl.innerHTML='';
-  historyEl.innerHTML+=`<div style="align-self:flex-end;background:var(--surface2);border:1px solid var(--border);padding:9px 12px;border-radius:12px 12px 0 12px;max-width:85%"><b>Вы:</b><br>${escapeHtml(message)}</div>`;
-  inputEl.value='';historyEl.scrollTop=historyEl.scrollHeight;inputEl.disabled=true;btnEl.disabled=true;btnEl.innerHTML='<span class="loading-spinner"></span>';
-  try{
-    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenario_id:currentChatSid,covenant_id:currentChatCid,message})});
-    const data=await res.json();
-    if(data.error) historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--breach-dim);padding:9px 12px;border-radius:12px 12px 12px 0;max-width:85%;color:var(--breach)"><b>Ошибка:</b><br>${escapeHtml(data.error)}</div>`;
-    else historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--accent-dim);padding:9px 12px;border-radius:12px 12px 12px 0;max-width:85%;border:1px solid #1DB95433"><b>🤖 Агент:</b><br>${data.reply.replace(/\n/g,'<br>')}</div>`;
-  }catch(e){historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--breach-dim);padding:9px 12px;border-radius:12px">Ошибка сети: ${e.message}</div>`;}
-  finally{inputEl.disabled=false;btnEl.disabled=false;btnEl.innerHTML='Отправить';historyEl.scrollTop=historyEl.scrollHeight;setTimeout(()=>inputEl.focus(),80);}
-}
-function openGlobalChat(){document.getElementById('globalChatModal').style.display='flex';setTimeout(()=>document.getElementById('globalChatInput').focus(),90)}
-async function sendGlobalChat(){
-  const inputEl=document.getElementById('globalChatInput'),btnEl=document.getElementById('btnGlobalSend'),historyEl=document.getElementById('globalChatHistory');
-  const message=inputEl.value.trim();if(!message) return;
-  if(historyEl.innerHTML.includes('Привет! Я Halyk AI')) historyEl.innerHTML='';
-  historyEl.innerHTML+=`<div style="align-self:flex-end;background:var(--surface2);border:1px solid var(--border);padding:9px 12px;border-radius:12px 12px 0 12px;max-width:85%"><b>Вы:</b><br>${escapeHtml(message)}</div>`;
-  inputEl.value='';historyEl.scrollTop=historyEl.scrollHeight;inputEl.disabled=true;btnEl.disabled=true;btnEl.innerHTML='<span class="loading-spinner"></span>';
-  try{
-    const res=await fetch('/api/global_chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});
-    const data=await res.json();
-    if(data.error) historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--breach-dim);padding:9px 12px;border-radius:12px 12px 12px 0;max-width:85%;color:var(--breach)"><b>Ошибка:</b><br>${escapeHtml(data.error)}</div>`;
-    else {
-      let reply=data.reply.replace(/\n/g,'<br>');
-      // подсветить ACTION теги если есть
-      if(reply.includes('[ACTION')) reply=reply.replace(/\[ACTION:[^\]]+\]/g,m=>`<code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:10px">${escapeHtml(m)}</code>`);
-      historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--accent-dim);padding:9px 12px;border-radius:12px 12px 12px 0;max-width:85%;border:1px solid #1DB95433"><b>🤖 Halyk AI:</b><br>${reply}</div>`;
-      // если был ACTION — обновить статус
-      if(data.reply.includes('[ACTION')) { setTimeout(()=>{refreshAll();loadProviders();},800); }
+function updatePipelineFromStatus(s){
+  const state=s.state;
+  if(state==='idle'){
+    for(let i=1;i<=6;i++) setPipelineStep(i,'idle');
+    document.getElementById('workflowStatus').textContent='ожидание';
+    document.getElementById('progressBar').style.width='0%';
+    document.getElementById('statusPill').className='status-pill status-idle';
+    document.getElementById('statusPill').textContent='IDLE';
+  } else if(state==='running'){
+    document.getElementById('workflowStatus').textContent='выполнение • '+ (s.current_scenario||'…') + ` (${s.progress||0}/${s.total||12})`;
+    document.getElementById('statusPill').className='status-pill status-running';
+    document.getElementById('statusPill').textContent='RUNNING';
+    // steps 1-2 done fast, 3-5 running based on progress
+    setPipelineStep(1,'done');
+    setPipelineStep(2,'done');
+    const pct=s.total? Math.round(s.progress/s.total*100):0;
+    document.getElementById('progressBar').style.width=pct+'%';
+    // infer: if progress < total, steps 3-5 running, else near done
+    if(s.progress < s.total){
+      setPipelineStep(3,'running');
+      setPipelineStep(4,s.progress>3?'running':'idle');
+      setPipelineStep(5,s.progress>6?'running':'idle');
+      setPipelineStep(6,'idle');
+    } else {
+      for(let i=3;i<=5;i++) setPipelineStep(i,'done');
+      setPipelineStep(6,'running');
     }
-  }catch(e){historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--breach-dim);padding:9px 12px;border-radius:12px">Ошибка сети: ${e.message}</div>`;}
-  finally{inputEl.disabled=false;btnEl.disabled=false;btnEl.innerHTML='Отправить';historyEl.scrollTop=historyEl.scrollHeight;setTimeout(()=>inputEl.focus(),80);}
+  } else if(state==='done'){
+    for(let i=1;i<=6;i++) setPipelineStep(i,'done');
+    document.getElementById('workflowStatus').textContent='завершено ✓';
+    document.getElementById('progressBar').style.width='100%';
+    document.getElementById('statusPill').className='status-pill status-done';
+    document.getElementById('statusPill').textContent='DONE';
+  } else if(state==='error'){
+    document.getElementById('workflowStatus').textContent='ошибка: '+(s.error||'');
+    document.getElementById('statusPill').className='status-pill status-error';
+    document.getElementById('statusPill').textContent='ERROR';
+  }
 }
-async function openEditModal(sid,cid){
-  const r=await fetch('/api/answers');const answers=await r.json();const cell=answers[sid]?.[cid];if(!cell) return;
-  document.getElementById('editScenarioId').textContent=sid;document.getElementById('editCovenantId').textContent=cid;
-  document.getElementById('editStatus').value=cell.status;document.getElementById('editActual').value=cell.actual;document.getElementById('editReasoning').value=cell.reasoning||'';
-  const evContainer=document.getElementById('evidenceContainer'),evContent=document.getElementById('evidenceContent');
-  if(cell.evidence_txn_id){evContainer.style.display='block';evContent.innerHTML=`Транзакция <strong>${cell.evidence_txn_id}</strong> — загрузка…`;
-    try{const txR=await fetch(`/api/transaction/${sid}/${cell.evidence_txn_id}`);if(txR.ok){const tx=await txR.json();evContent.innerHTML=`<strong>ID:</strong> ${tx.txn_id} · <strong>Дата:</strong> ${tx.date}<br><strong>Сумма:</strong> ${tx.amount} ${tx.currency}<br><strong>Контрагент:</strong> ${escapeHtml(tx.counterparty||'—')}<br><strong>Назначение:</strong> ${escapeHtml(tx.description||'—')}`;}else evContent.innerHTML=`Не найдена ${cell.evidence_txn_id}`;}catch(e){evContent.innerHTML='Ошибка загрузки';}
-  } else evContainer.style.display='none';
-  document.getElementById('editModal').style.display='flex';
+function updatePipelineFromLog(msg){
+  const low=msg.toLowerCase();
+  if(low.includes('extract')||low.includes('извлеч')){
+    setPipelineStep(1,'running');
+    if(low.includes('✅')||low.includes('extracted')) setPipelineStep(1,'done');
+  }
+  if(low.includes('classif')||low.includes('index')){
+    setPipelineStep(2,'running');
+    if(low.includes('indexed')) setPipelineStep(2,'done');
+  }
+  if(low.includes('scenario')||low.includes('p1')||low.includes('react')){
+    setPipelineStep(3,'running');
+    setPipelineStep(4,'running');
+  }
+  if(low.includes('verif')||low.includes('провер')){
+    setPipelineStep(5,'running');
+  }
+  if(low.includes('submission')||low.includes('finished')||low.includes('заверш')){
+    setPipelineStep(5,'done');
+    setPipelineStep(6,'done');
+  }
 }
-async function saveEdit(){
-  const sid=document.getElementById('editScenarioId').textContent,cid=document.getElementById('editCovenantId').textContent;
-  const status=document.getElementById('editStatus').value,actual=parseFloat(document.getElementById('editActual').value),reasoning=document.getElementById('editReasoning').value;
-  const r=await fetch('/api/edit_answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenario_id:sid,covenant_id:cid,status,actual,reasoning})});
-  if(r.ok){document.getElementById('editModal').style.display='none';showToast('Сохранено ✅');await refreshAnswers();await evaluate();}else showToast('Ошибка сохранения','error');
+
+// Status polling
+async function fetchStatus(){
+  try{
+    const r=await fetch('/api/status');
+    const data=await r.json();
+    updatePipelineFromStatus(data);
+    return data;
+  }catch(e){ return null; }
 }
-function updateStatus(data){
-  const badge=document.getElementById('statusBadge');badge.textContent=(data.state||'idle').toUpperCase();badge.className='status-badge status-'+(data.state||'idle');
-  const total=data.total||0,progress=data.progress||0;
-  const pct=total>0?Math.round(progress/total*100):(data.state==='done'?100:0);
-  document.getElementById('progressFill').style.width=(data.state==='done'?100:pct)+'%';
-  document.getElementById('progressText').textContent=
-    data.state==='running'?`Анализ: ${data.current_scenario||'…'} (${progress}/${total})`:
-    data.state==='done'?'Завершено ✅ — открой вкладку «Результаты»':
-    data.state==='error'?`Ошибка: ${data.error}`:'Система готова к запуску';
+let pollTimer=null;
+function startPolling(){
+  if(pollTimer) clearInterval(pollTimer);
+  pollTimer=setInterval(async()=>{
+    const s=await fetchStatus();
+    await loadAnswers(false);
+    if(s && s.state!=='running'){
+      clearInterval(pollTimer); pollTimer=null;
+      isRunning=false;
+      document.getElementById('btnRun').disabled=false;
+      document.getElementById('runIcon').textContent='▶';
+      if(s.state==='done'){
+        appendAgent('✅ Анализ завершён. Результаты и reasoning — справа в артефактах. Скачай submission.json или спроси про любой ковенант.');
+        await evaluate();
+      } else if(s.state==='error'){
+        appendSystem('❌ Ошибка: '+(s.error||'неизвестно'));
+      }
+    }
+  },2000);
 }
-async function uploadDataset(file){
-  if(!file) return;const btn=document.getElementById('btnUpload'),icon=document.getElementById('uploadIcon');icon.className='loading-spinner';icon.textContent='';btn.disabled=true;
-  showToast('Загрузка датасета…','success');const fd=new FormData();fd.append('file',file);
-  try{const r=await fetch('/api/upload',{method:'POST',body:fd});const data=await r.json();if(data.ok){showToast('Датасет загружен — запускаем анализ');runAgent();}else showToast('Ошибка: '+data.error,'error');}catch(e){showToast('Ошибка сети','error');}
-  finally{icon.className='';icon.textContent='📁';btn.disabled=false;document.getElementById('datasetUpload').value='';}
+
+// Answers & results
+async function loadAnswers(showToastOnEmpty=false){
+  try{
+    const r=await fetch('/api/answers');
+    const data=await r.json();
+    answersCache=data;
+    renderResults(data);
+    updateSubmissionPreview(data);
+    // stats
+    let filled=0;
+    for(const sid of SCENARIOS){
+      for(const cid of ['6.1','6.2','6.3']){
+        if(data[sid]?.[cid]?.status) filled++;
+      }
+    }
+    document.getElementById('statCells').textContent=filled+'/36';
+    document.getElementById('resultsMeta').textContent=filled? `${filled} ячеек`:'нет данных';
+    if(filled){
+      appendAgentOnce('ready');
+    }
+    // fetch dataset stats lazily
+    loadDatasetStats();
+  }catch(e){}
 }
-function formatCurrency(val){if(val==null||val==='null'||val==='') return '—';return '$'+Number(val).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function formatRatio(val){if(val==null||val==='null'||val==='') return '—';return Number(val).toFixed(2)+'x';}
-function escapeHtml(text){const m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};return String(text).replace(/[&<>"']/g,k=>m[k]);}
-function renderAnswers(answers){
-  const tbody=document.getElementById('answersBody');let html='',filled=0,breach=0,compliant=0;
+let readyAnnounced=false;
+function appendAgentOnce(key){
+  if(readyAnnounced) return;
+  readyAnnounced=true;
+  // don't spam
+}
+
+function renderResults(answers){
+  const tbody=document.getElementById('resultsBody');
+  let html='';
   for(const sid of SCENARIOS){
-    if(!answers[sid]) continue;
-    let hasData=false,detailsId=`details-${sid}`;
-    let rowHtml=`<tr style="cursor:pointer" onclick="const d=document.getElementById('${detailsId}');if(d)d.style.display=d.style.display==='none'?'table-row':'none'">
-      <td><span style="background:var(--surface3);padding:3px 7px;border-radius:6px;font-size:10px">▼</span> <strong style="color:var(--accent);font-size:13px">${sid}</strong></td>`;
-    let comments=[];
+    const row=answers[sid];
+    if(!row) continue;
+    let has=false;
+    let tr=`<tr>`;
+    tr+=`<td><b style="color:var(--accent)">${sid}</b></td>`;
     for(const cid of ['6.1','6.2','6.3']){
-      const cell=answers[sid]?.[cid];
-      if(cell && cell.status){hasData=true;filled++;if(cell.status==='BREACH') breach++;else compliant++;
+      const cell=row[cid];
+      if(cell && cell.status){
+        has=true;
         const tag=cell.status==='BREACH'?'tag-breach':'tag-compliant';
-        rowHtml+=`<td><span class="${tag}">${cell.status}</span></td>`;
-        let actualVal=cid==='6.1'&&Number(cell.actual)<10?formatRatio(cell.actual):formatCurrency(cell.actual);
-        // auto-detect ratio vs sum: if actual < 5 and not big sum, treat as ratio
-        if(cell.actual!=null && Number(cell.actual)<20 && String(cid)==='6.1') {/* keep ratio */}
-        rowHtml+=`<td>${actualVal}</td>`;
-        rowHtml+=`<td style="font-size:10px;color:var(--text-dim);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${cell.evidence_txn_id||'—'}">${cell.evidence_txn_id||'—'}</td>`;
-        if(cell.reasoning){
-          let comment=`<div style="background:var(--surface2);padding:12px;border-radius:10px;margin-bottom:8px;border-left:3px solid var(${cell.status==='BREACH'?'--breach':'--compliant'});position:relative">`;
-          comment+=`<button class="btn-secondary btn-small" onclick="event.stopPropagation();openEditModal('${sid}','${cid}')" style="position:absolute;right:12px;top:12px">✏️</button>`;
-          comment+=`<button class="btn-secondary btn-small" onclick="event.stopPropagation();openChatModal('${sid}','${cid}')" style="position:absolute;right:62px;top:12px">💬</button>`;
-          comment+=`<strong>Ковенант ${cid}</strong> <span class="${tag}" style="font-size:10px;margin-left:6px">${cell.status}</span><br>`;
-          let fR=cell.reasoning.replace(/\n•/g,'<br>•').replace(/\n-/g,'<br>—');
-          comment+=`<div style="margin-top:8px;font-size:12px;line-height:1.6;color:#D0D4E0">${fR}</div>`;
-          if(cell.graph_mermaid){
-            const mId=`mermaid-${sid}-${cid.replace('.','')}`;
-            comment+=`<div style="margin-top:10px"><button class="btn-secondary btn-small" onclick="event.stopPropagation();toggleMermaid(this,'${mId}')">Показать граф</button></div>`;
-            comment+=`<div id="${mId}-code" style="display:none">${escapeHtml(cell.graph_mermaid)}</div>`;
-            comment+=`<div id="${mId}" style="display:none;margin-top:10px;background:#080C0B;padding:14px;border-radius:10px;overflow:auto"></div>`;
-          }
-          comment+=`</div>`;comments.push(comment);
-        }
-      } else rowHtml+='<td class="tag-empty">—</td><td class="tag-empty">—</td><td class="tag-empty">—</td>';
+        const actual= cid==='6.1' && Number(cell.actual)<20 ? formatRatio(cell.actual) : formatCurrency(cell.actual);
+        const evidence=cell.evidence_txn_id||'—';
+        tr+=`<td>
+          <div><span class="tag ${tag}">${cell.status}</span></div>
+          <div class="small" style="margin-top:4px;white-space:nowrap">${actual}</div>
+          <div class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px" title="${escapeHtml(evidence)}">${escapeHtml(evidence)}</div>
+        </td>`;
+      } else {
+        tr+=`<td class="tag-idle">—</td>`;
+      }
     }
-    rowHtml+='</tr>';
-    if(hasData){html+=rowHtml;
-      if(comments.length){let hasBreach=comments.some(c=>c.includes('tag-breach'));let display=hasBreach?'table-row':'none';
-        html+=`<tr id="${detailsId}" style="display:${display}"><td colspan="10" style="padding:16px 18px;background:var(--bg);border-bottom:1px solid var(--border)"><div style="color:var(--text-dim);font-weight:700;margin-bottom:8px;font-size:11px;letter-spacing:.06em">Бизнес-выводы по ${sid}</div>${comments.join('')}</td></tr>`;
+    tr+='</tr>';
+    // reasoning row if any
+    if(has){
+      let reasoningHtml='';
+      for(const cid of ['6.1','6.2','6.3']){
+        const cell=row[cid];
+        if(cell && cell.reasoning){
+          reasoningHtml+=`<div style="margin-bottom:8px"><b style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim)">${sid} • ${cid} — ${cell.status}</b><div style="font-size:12px;line-height:1.6;color:var(--text-dim);margin-top:4px;white-space:pre-wrap">${escapeHtml(cell.reasoning).slice(0,600)}</div></div>`;
+        }
+      }
+      // clickable row
+      tr=`<tr style="cursor:pointer" onclick="showReasoning('${sid}')">${tr.slice(4)}`; // careful
+      // simpler: add click handler via attribute
+      html+=`<tr style="cursor:pointer" onclick="showReasoning('${sid}')"><td><b style="color:var(--accent)">${sid}</b></td>`;
+      for(const cid of ['6.1','6.2','6.3']){
+        const cell=row[cid];
+        if(cell && cell.status){
+          const tag=cell.status==='BREACH'?'tag-breach':'tag-compliant';
+          const actual= cid==='6.1' && Number(cell.actual)<20 ? formatRatio(cell.actual) : formatCurrency(cell.actual);
+          const evidence=cell.evidence_txn_id||'—';
+          html+=`<td><div><span class="tag ${tag}">${cell.status}</span></div><div class="small" style="margin-top:4px">${actual}</div><div class="small muted" title="${escapeHtml(evidence)}" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(evidence)}</div></td>`;
+        } else html+=`<td class="tag-idle">—</td>`;
+      }
+      html+=`</tr>`;
+    }
+  }
+  if(!html) html=`<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--text-faint)">Нет данных — запусти агента</td></tr>`;
+  tbody.innerHTML=html;
+}
+function showReasoning(sid){
+  const row=answersCache[sid];
+  if(!row) return;
+  const box=document.getElementById('resultsReasoning');
+  const content=document.getElementById('reasoningContent');
+  let html='';
+  for(const cid of ['6.1','6.2','6.3']){
+    const cell=row[cid];
+    if(!cell) continue;
+    html+=`${sid} • ${cid} — ${cell.status} • actual: ${cell.actual} • evidence: ${cell.evidence_txn_id||'null'}\n`;
+    html+=(cell.reasoning||'(нет reasoning)')+'\n';
+    html+='—'.repeat(40)+'\n';
+  }
+  content.textContent=html;
+  box.style.display='block';
+  // also push to chat
+  appendAgent(`📋 ${sid} — бизнес-обоснование:\n`+html.slice(0,1200));
+  document.getElementById('reasoningContent').scrollTop=0;
+}
+
+// Submission preview
+function updateSubmissionPreview(answers){
+  if(!answers || !Object.keys(answers).length) return;
+  try{
+    const preview={team:"wit.kz",contact_email:"info@wit.kz",model:"muse-spark-1.2-contributor",answers};
+    const str=JSON.stringify(preview,null,2);
+    document.getElementById('previewCode').textContent=str.slice(0,2000)+(str.length>2000?'…':'');
+  }catch(e){}
+}
+async function copySubmission(){
+  const text=document.getElementById('previewCode').textContent;
+  try{ await navigator.clipboard.writeText(text); showToast('Скопировано'); }catch{ showToast('Копирование не удалось','error'); }
+}
+async function downloadSubmission(){
+  try{
+    const r=await fetch('/api/submission');
+    if(!r.ok){ showToast('submission.json не найден — запусти агента','error'); return; }
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='submission.json'; a.click();
+    URL.revokeObjectURL(url);
+    showToast('Скачиваю submission.json');
+  }catch(e){ showToast('Ошибка скачивания','error'); }
+}
+
+// Evaluate
+async function evaluate(){
+  try{
+    const r=await fetch('/api/evaluate');
+    const data=await r.json();
+    if(data.error){
+      document.getElementById('scoreValue').textContent='—';
+      document.getElementById('scoreSub').textContent=data.error;
+      return;
+    }
+    document.getElementById('scoreValue').textContent=data.percentage.toFixed(1)+'%';
+    document.getElementById('scoreSub').textContent=`${data.total_score.toFixed(2)} / ${data.max_score} • ${data.cells_scored||''} баллов`;
+    let details='';
+    if(data.cells){
+      let worst=[];
+      for(const [cell,score] of Object.entries(data.cells)){
+        if(score.total<1) worst.push([cell,score]);
+      }
+      worst.sort((a,b)=>a[1].total-b[1].total);
+      if(worst.length) details='Слабые ячейки: '+worst.slice(0,3).map(([k,s])=>`${k} ${s.total.toFixed(2)} (${s.details||''})`).join(' • ');
+    }
+    document.getElementById('evalDetails').textContent=details;
+    appendAgent(`📊 Оценка: **${data.percentage.toFixed(1)}%** (${data.total_score.toFixed(2)}/${data.max_score}) — status 0.50 / actual 0.30 / evidence 0.20. Проверь артефакт «Результаты».`);
+  }catch(e){
+    showToast('Оценка не удалась','error');
+  }
+}
+
+// Run
+async function runAgent(scenarios=null){
+  if(isRunning) return;
+  isRunning=true;
+  document.getElementById('btnRun').disabled=true;
+  document.getElementById('runIcon').textContent='⏳';
+  if(scenarios) appendUser('запусти '+scenarios.join(', '));
+  else appendUser('Запусти все сценарии');
+  appendSystem('Запускаю агента… проверяю провайдера и датасет');
+  try{
+    const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json',...adminHeaders()},body:JSON.stringify(scenarios?{scenarios}:{})});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){
+      showToast(data.error||'Ошибка запуска','error');
+      appendSystem('❌ '+(data.error||'Ошибка запуска'));
+      if((data.error||'').includes('Muse Spark')||(data.error||'').includes('No active')){
+        appendAgent('⚠️ Нужен MUSE_SPARK_API_KEY. Добавь ключ в .env и перезапусти контейнер, или открой ⚙️ и вставь Admin Token + ключ. Для хакатона у нас уже есть ключ в env на halyk.wit.kz.');
+      }
+      isRunning=false;
+      document.getElementById('btnRun').disabled=false;
+      document.getElementById('runIcon').textContent='▶';
+      return;
+    }
+    showToast('Агент запущен • '+ (data.executor||'threading'));
+    appendSystem('🚀 Агент запущен ('+(data.executor||'threading')+') • сценарии: '+(data.scenarios||scenarios||['все']).join(', '));
+    startPolling();
+  }catch(e){
+    showToast('Сеть недоступна','error');
+    appendSystem('❌ Сеть: '+e.message);
+    isRunning=false;
+    document.getElementById('btnRun').disabled=false;
+    document.getElementById('runIcon').textContent='▶';
+  }
+}
+
+// Upload
+function triggerUpload(){
+  document.getElementById('zipInput').click();
+}
+document.getElementById('zipInput').addEventListener('change', async (e)=>{
+  const file=e.target.files[0];
+  if(!file) return;
+  if(!file.name.endsWith('.zip')){ showToast('Только .zip','error'); return; }
+  appendUser('📁 Загружаю датасет: '+file.name);
+  appendSystem('Загрузка ZIP…');
+  const fd=new FormData(); fd.append('file',file);
+  try{
+    const r=await fetch('/api/upload',{method:'POST',headers:{...adminHeaders()},body:fd});
+    const data=await r.json().catch(()=>({}));
+    if(data.ok||r.ok){
+      showToast('Датасет загружен');
+      appendSystem('✅ Датасет загружен — кэш очищен. Запускаю анализ…');
+      document.getElementById('datasetInfo').textContent=file.name+' • загружен';
+      runAgent();
+    } else {
+      showToast(data.error||'Ошибка загрузки','error');
+      appendSystem('❌ '+ (data.error||'Ошибка'));
+    }
+  }catch(e){ showToast('Ошибка сети','error'); appendSystem('❌ '+e.message); }
+  finally{ e.target.value=''; }
+});
+// Drag & drop
+const dropZone=document.getElementById('dropZone');
+dropZone.addEventListener('dragover',e=>{e.preventDefault(); dropZone.style.borderColor='var(--accent)';});
+dropZone.addEventListener('dragleave',()=>{dropZone.style.borderColor='var(--border)';});
+dropZone.addEventListener('drop',e=>{
+  e.preventDefault(); dropZone.style.borderColor='var(--border)';
+  const file=e.dataTransfer.files[0];
+  if(file && file.name.endsWith('.zip')){
+    document.getElementById('zipInput').files=e.dataTransfer.files;
+    document.getElementById('zipInput').dispatchEvent(new Event('change'));
+  } else showToast('Перетащи .zip','error');
+});
+
+// Chat send
+async function sendMessage(){
+  const input=document.getElementById('chatInput');
+  const text=input.value.trim();
+  if(!text) return;
+  input.value='';
+  // commands without LLM
+  const low=text.toLowerCase();
+  if(low.includes('скачай')||low.includes('download')||low.includes('submission')){
+    appendUser(text);
+    downloadSubmission();
+    appendAgent('Скачиваю submission.json — проверь загрузки браузера. Также доступен `GET /api/submission`.');
+    return;
+  }
+  if(low.includes('покажи нарушения')||low.includes('нарушен')){
+    appendUser(text);
+    const breaches=[];
+    for(const sid of SCENARIOS){
+      for(const cid of ['6.1','6.2','6.3']){
+        const c=answersCache[sid]?.[cid];
+        if(c?.status==='BREACH') breaches.push(`${sid}.${cid} ${c.actual} ${c.evidence_txn_id||''}`);
+      }
+    }
+    if(breaches.length) appendAgent('🔴 Нарушения:\n'+breaches.join('\n'));
+    else appendAgent('Нет нарушений в текущих ответах — или агент ещё не запущен.');
+    return;
+  }
+  // quick run commands
+  if(low.includes('запусти')||low.includes('запуск')||low.startsWith('run')){
+    appendUser(text);
+    let scenarios=null;
+    if(low.includes('все')||low.includes('all')) scenarios=null;
+    else {
+      const found=text.toUpperCase().match(/\b(P\d{1,2}|B1|B4)\b/g);
+      if(found) scenarios=[...new Set(found)];
+    }
+    if(low.includes('запусти')||scenarios){
+      runAgent(scenarios);
+      return;
+    }
+  }
+  // explain
+  if(low.includes('объясни')||low.includes('что с')||low.includes('почему')){
+    appendUser(text);
+    // try to find scenario/covenant in text
+    const m=text.toUpperCase().match(/(P\d{1,2}|B1|B4)[\s\.\-]*6\.([123])/);
+    if(m){
+      const sid=m[1], cid='6.'+m[2];
+      const cell=answersCache[sid]?.[cid];
+      if(cell){
+        appendAgent(`**${sid} • ${cid}** — ${cell.status} • actual=${cell.actual} • evidence=${cell.evidence_txn_id||'null'}\n\n${cell.reasoning||'(reasoning пока пуст — запусти агента)'}`);
+        showReasoning(sid);
+        return;
       }
     }
   }
-  if(!html) html=`<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--text-dim)">Нет данных — запусти агента. После завершения здесь появятся 36 ячеек с reasoning.</td></tr>`;
-  tbody.innerHTML=html;
-  document.getElementById('statFilled').textContent=filled;
-  document.getElementById('statBreach').textContent=breach;
-  document.getElementById('statCompliant').textContent=compliant;
+
+  appendUser(text);
+  // fallback to LLM global chat
+  const btn=document.getElementById('btnSend');
+  btn.disabled=true; btn.textContent='…';
+  try{
+    const r=await fetch('/api/global_chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text})});
+    const data=await r.json().catch(()=>({}));
+    if(data.reply){
+      let reply=data.reply.replace(/\[ACTION:[^\]]+\]/g,'').trim();
+      appendAgent(reply);
+      if(data.reply.includes('[ACTION')){
+        setTimeout(async()=>{ await fetchStatus(); await loadAnswers(); },800);
+      }
+    } else if(data.error){
+      appendSystem('⚠️ '+(data.error));
+      showToast(data.error,'error');
+    }
+  }catch(e){
+    appendSystem('❌ Ошибка чата: '+e.message);
+  } finally {
+    btn.disabled=false; btn.textContent='Отправить';
+  }
 }
-async function toggleMermaid(btn,id){
-  const div=document.getElementById(id),code=document.getElementById(id+'-code').textContent;
-  if(div.style.display==='none'){div.style.display='block';btn.textContent='Скрыть граф';
-    if(!div.hasAttribute('data-rendered')){try{const {svg}=await mermaid.render('svg-'+id,code);div.innerHTML=svg;div.setAttribute('data-rendered','true');}catch(e){div.innerHTML='<div style="color:var(--breach)">Ошибка Mermaid: '+e.message+'</div>';}}
-  } else {div.style.display='none';btn.textContent='Показать граф';}
+function quickPrompt(t){
+  document.getElementById('chatInput').value=t;
+  sendMessage();
 }
-// Close modals on overlay click
-document.querySelectorAll('.modal-overlay').forEach(ov=>ov.addEventListener('click',e=>{if(e.target===ov) ov.style.display='none';}));
-// Initial load
-refreshAll();evaluate();loadMetrics();loadProviders();
-setInterval(refreshStatus,4000);
+document.getElementById('chatInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+});
+document.getElementById('chatInput').addEventListener('input',e=>{
+  e.target.style.height='auto';
+  e.target.style.height=Math.min(e.target.scrollHeight,120)+'px';
+});
+
+// WebSocket
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  try{
+    ws=new WebSocket(`${proto}://${location.host}/ws/logs`);
+    ws.onmessage=e=>{
+      const msg=e.data;
+      updatePipelineFromLog(msg);
+      // stream as collapsible system log, not spam chat
+      // show only important logs in chat
+      if(msg.includes('✅')||msg.includes('📂')||msg.includes('Scenario')||msg.includes('finished')||msg.includes('Error')||msg.includes('BREACH')||msg.includes('COMPLIANT')){
+        appendSystem(msg);
+      }
+    };
+    ws.onclose=()=> setTimeout(connectWS,2500);
+    ws.onerror=()=>{};
+  }catch(e){}
+}
+
+// Dataset stats
+async function loadDatasetStats(){
+  try{
+    const r=await fetch('/api/documents');
+    const data=await r.json();
+    if(data && typeof data==='object' && !data.error){
+      const count=Array.isArray(data)? data.length : Object.keys(data).length;
+      if(count) document.getElementById('statDocs').textContent=count;
+    }
+  }catch{}
+  try{
+    const r=await fetch('/health');
+    const h=await r.json();
+    if(h.checks?.ledger?.rows) document.getElementById('statTxns').textContent=h.checks.ledger.rows;
+  }catch{
+    // fallback
+    document.getElementById('statTxns').textContent='—';
+  }
+}
+
+// Settings
+function openSettings(){
+  document.getElementById('settingsModal').style.display='flex';
+  document.getElementById('adminTokenInput').value=localStorage.getItem('admin_token')||'';
+  fetch('/api/providers').then(r=>r.json()).then(p=>{
+    let html='';
+    for(const [k,v] of Object.entries(p)){
+      html+=`<div>${k}: ${v.enabled?'вкл':'выкл'} • ${v.api_key_set?'ключ задан':'нет ключа'} • ${v.models.fast}</div>`;
+    }
+    document.getElementById('providersMini').innerHTML=html;
+  }).catch(()=>{});
+}
+function closeSettings(){ document.getElementById('settingsModal').style.display='none'; }
+function saveSettings(){
+  const t=document.getElementById('adminTokenInput').value.trim();
+  if(t) localStorage.setItem('admin_token',t); else localStorage.removeItem('admin_token');
+  showToast('Сохранено');
+  closeSettings();
+}
+function clearSettings(){
+  localStorage.removeItem('admin_token');
+  document.getElementById('adminTokenInput').value='';
+  showToast('Очищено');
+}
+document.getElementById('settingsModal').addEventListener('click',e=>{ if(e.target.id==='settingsModal') closeSettings(); });
+
+// Refresh
+async function refreshAll(){
+  await fetchStatus();
+  await loadAnswers();
+  await evaluate();
+}
+
+// Init
+connectWS();
+refreshAll();
+setInterval(fetchStatus,5000);
 </script>
 </body>
 </html>
