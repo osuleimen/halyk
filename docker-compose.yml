@@ -4,21 +4,18 @@ services:
     container_name: halyk-covenant-agent
     restart: unless-stopped
     ports:
-      # публикуем только на localhost — наружу терминирует nginx на 443
-      # на cloud-001 заняты 3000,3005,8000,8005,8080,8100,8400,8500,7880-82 и т.д.
-      # поэтому по умолчанию 18080 (свободен по ss -tunlp выше)
-      # можно переопределить через .env: HALYK_PORT=18081
+      # 18080 — свободен на cloud-001 (заняты 3000,3005,8000,8005,8080,8100,8400,8500,7880-82)
+      # На Caddy можно вообще без хост-порта — Caddy идёт по внутренней сети onaiu_network
       - "127.0.0.1:${HALYK_PORT:-18080}:8000"
     volumes:
       - halyk_cache:/app/cache
     environment:
       - PYTHONUNBUFFERED=1
-      # если на хосте уже есть Redis для Celery — укажи его URL в .env (CELERY_BROKER_URL)
-      # иначе используется внутренний halyk-redis
       - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://halyk-redis:6379/1}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://halyk-redis:6379/2}
     networks:
       - halyk-net
+      - onaiu_network
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys; data=urllib.request.urlopen('http://127.0.0.1:8000/api/status',timeout=5).read(); sys.exit(0 if b'state' in data else 1)\""]
       interval: 10s
@@ -101,6 +98,10 @@ services:
 networks:
   halyk-net:
     driver: bridge
+  onaiu_network:
+    external: true
+    # если сети нет (первый раз) — создаст halyk-net, а onaiu_network уже создана onaiu стеком
+    # если нужно создать вручную: docker network create onaiu_network
 
 volumes:
   halyk_cache:

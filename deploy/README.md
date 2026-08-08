@@ -7,26 +7,45 @@
 - `deploy/nginx-halyk.wit.kz.conf` — **аккуратный** nginx `server` для `halyk.wit.kz` (upstream `127.0.0.1:8000`). Не затирает существующий reverse.
 - `deploy/deploy.sh` / `deploy/.env.example` — деплой под root.
 
-## Развертывание (под root на halyk.wit.kz)
+## Развертывание на cloud-001 (там уже Caddy, не Nginx)
+
+### Вариант A — через существующий onaiu_caddy (рекомендуется, аккуратно)
+Caddy уже слушает 80/443 (контейнер `onaiu_caddy` Up 2 months, healthy) — не ставь Nginx рядом, просто подключи Halyk к его сети:
 
 ```bash
-# 1) залить репо на сервер (или git pull если уже есть)
-cd /opt/halyk
-git pull
+cd /opt/halyk && git pull
 
-# 2) (опционально) если на хосте уже есть Redis для wit.kz — подключи его:
-cp deploy/.env.example .env
-# nano .env  # раскомментируй CELERY_BROKER_URL=redis://127.0.0.1:6379/1
-# иначе оставь по умолчанию — поднимется изолированный halyk-redis
+# 1) убедиться что сеть есть (создана onaiu стеком)
+docker network ls | grep onaiu_network || docker network create onaiu_network
 
-# 3) запустить деплой (бэкап nginx, не трогает другие сайты)
-sudo bash deploy/deploy.sh
+# 2) подключить halyk к onaiu_network (уже в docker-compose.yml) и поднять
+docker compose up -d
+docker compose ps  # halyk, halyk-redis, halyk-celery, halyk-beat
 
-# 4) проверить
-curl -s http://127.0.0.1:8000/api/status | jq .           # должен быть 200
-curl -s http://127.0.0.1:8000/api/providers | jq .        # muse_spark enabled
-docker compose ps                                          # halyk, halyk-redis, halyk-celery healthy
-docker compose logs halyk-celery --tail 50                # воркер слушает
+# 3) аккуратно добавить halyk.wit.kz в Caddyfile onaiu (не затирать весь файл)
+# на хосте Caddyfile обычно в /opt/onaiu/Caddyfile или ./Caddyfile
+cat deploy/Caddyfile.halyk.snippet  # посмотри блок halyk.wit.kz
+# вставь его в конец существующего Caddyfile:
+cat >> /opt/onaiu/Caddyfile < deploy/Caddyfile.halyk.snippet
+# или если onaiu Caddyfile в другом месте:
+# cat >> ./Caddyfile < deploy/Caddyfile.halyk.snippet
+
+# 4) перезагрузить Caddy без даунтайма (проверка внутри контейнера)
+docker exec onaiu_caddy caddy validate --config /etc/caddy/Caddyfile
+docker exec onaiu_caddy caddy reload --config /etc/caddy/Caddyfile
+# логи
+docker logs onaiu_caddy --tail 50 | grep -i halyk
+
+# 5) проверить
+curl -s http://127.0.0.1:18080/api/status | jq .  # напрямую halyk
+curl -s https://halyk.wit.kz/api/status | jq .    # через Caddy (TLS автоматом от Caddy)
+```
+
+### Вариант B — если оставишь Nginx (запасной)
+```bash
+# halyk уже на 18080 (свободен, 8000/8080/8100 заняты по ss)
+sudo bash deploy/deploy.sh  # ставит nginx-halyk.wit.kz.conf на 18080
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ## Reverse proxy — аккуратно
