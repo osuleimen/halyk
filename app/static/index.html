@@ -527,12 +527,13 @@ async function loadProviders(){
     const isSpark=pid==='muse_spark';
     const card=document.createElement('div');
     card.className='provider-card'+(isActive?' active':'')+(isSpark?' recommended':'');
+    const cancelBtn = isSpark ? `<button class="btn-secondary btn-small" onclick="clearKey('${pid}')" title="Очистить ключ и отключить">✖ Отмена</button>` : '';
     card.innerHTML=`
       <div class="p-header"><div><div class="p-name">${cfg.name} ${isSpark?'⭐':''}</div><div class="p-model">${cfg.models.fast}</div></div>
         <label class="toggle"><input type="checkbox" ${cfg.enabled?'checked':''} onchange="toggleProvider('${pid}',this.checked)"><span class="slider"></span></label>
       </div>
-      <input type="password" id="key-${pid}" placeholder="API Key" value="${cfg.api_key_set?cfg.api_key_masked:''}" onfocus="if(this.value.includes('...'))this.value=''">
-      <div style="display:flex;gap:6px;margin-top:8px"><button class="btn-secondary btn-small" onclick="saveKey('${pid}')">💾 Сохранить</button><button class="btn-secondary btn-small" onclick="testProvider('${pid}')">🧪 Тест</button></div>
+      <input type="password" id="key-${pid}" placeholder="API Key" value="${cfg.api_key_set?cfg.api_key_masked:''}" onfocus="if(this.value.includes('...'))this.value=''" autocomplete="off" spellcheck="false">
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn-secondary btn-small" onclick="saveKey('${pid}')">💾 Сохранить</button><button class="btn-secondary btn-small" onclick="testProvider('${pid}')">🧪 Тест</button>${cancelBtn}</div>
       <div class="p-status ${isActive?'p-status-on':'p-status-off'}" style="margin-top:8px;display:inline-block">${isActive?'● Активен':'○ Неактивен'}</div>
       ${isSpark?'<div style="margin-top:8px;font-size:11px;color:var(--accent)">Основная модель Halyk — выбрана по замерам</div>':''}
     `;
@@ -540,13 +541,29 @@ async function loadProviders(){
   }
 }
 async function saveKey(pid){
-  const key=document.getElementById('key-'+pid).value;
+  const el=document.getElementById('key-'+pid);
+  let key=el.value.trim();
   if(!key || key.includes('...')) return showToast('Введи API ключ','error');
-  const r=await fetch('/api/providers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider_id:pid,api_key:key,enabled:true})});
-  const data=await r.json();if(data.ok){showToast('Ключ сохранён ✅');loadProviders();}else showToast('Ошибка: '+data.error,'error');
+  // Muse Spark ключи LLM_... часто с пробелами — чистим
+  if(key.length < 10) return showToast('Ключ слишком короткий','error');
+  const r=await fetch('/api/providers',{method:'POST',headers:{'Content-Type':'application/json',...adminHeaders()},body:JSON.stringify({provider_id:pid,api_key:key,enabled:true})});
+  const data=await r.json();
+  if(data.ok){
+    showToast('Ключ сохранён ✅ — проверяю...','success');
+    el.value=''; // очистим чтобы не светить ключ
+    await loadProviders();
+    // сразу тест чтобы показать точки или ошибку
+    setTimeout(()=>testProvider(pid), 400);
+  } else showToast('Ошибка: '+(data.error||'не сохранён'),'error');
+}
+async function clearKey(pid){
+  if(!confirm('Очистить ключ '+pid+' и отключить провайдера?')) return;
+  const r=await fetch('/api/providers',{method:'POST',headers:{'Content-Type':'application/json',...adminHeaders()},body:JSON.stringify({provider_id:pid,api_key:"",enabled:false})});
+  const data=await r.json();
+  if(data.ok){showToast('Ключ очищен','success');document.getElementById('key-'+pid).value='';loadProviders();}else showToast('Ошибка: '+data.error,'error');
 }
 async function toggleProvider(pid,enabled){
-  await fetch('/api/providers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider_id:pid,enabled})});loadProviders();
+  await fetch('/api/providers',{method:'POST',headers:{'Content-Type':'application/json',...adminHeaders()},body:JSON.stringify({provider_id:pid,enabled})});loadProviders();
 }
 async function testProvider(pid){
   const key=document.getElementById('key-'+pid).value;showToast('Тестирую…','success');
@@ -558,8 +575,25 @@ async function runAgent(scenarios=null){
   document.getElementById('btnRunAll').disabled=true;document.getElementById('btnRunP1').disabled=true;
   const icon=document.getElementById('runAllIcon');icon.className='loading-spinner';icon.textContent='';
   showToast('Запуск анализа…','success');
-  await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(scenarios?{scenarios}:{ })});
+  const r = await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json',...adminHeaders()},body:JSON.stringify(scenarios?{scenarios}:{ })});
+  const data = await r.json().catch(()=>({}));
+  if(!r.ok){
+    showToast(data.error || 'Ошибка запуска', 'error');
+    isAgentRunning=false;
+    document.getElementById('btnRunAll').disabled=false;document.getElementById('btnRunP1').disabled=false;
+    icon.className='';icon.textContent='▶';
+    // подсветить провайдеры если ключ не задан
+    if((data.error||'').includes('Muse Spark')) {
+      document.querySelector('[data-tab="providers"]').click();
+      showToast('Вставь Muse Spark ключ в Провайдерах → Save','error');
+    }
+    return;
+  }
   pollStatus();
+}
+function adminHeaders(){
+  const t=localStorage.getItem('admin_token')||'';
+  return t?{'X-Admin-Token':t}:{};
 }
 async function refreshAll(){await refreshStatus();await refreshAnswers();}
 async function refreshStatus(){const r=await fetch('/api/status');const data=await r.json();updateStatus(data);}

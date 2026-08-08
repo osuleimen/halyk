@@ -314,6 +314,13 @@ async def api_run(req: RunRequest, request: Request):
     _require_admin(request)
     global agent_status, agent_answers
 
+    # BigTech: проверяем провайдер до старта, чтобы не висеть 0/12
+    try:
+        from config import get_active_provider
+        get_active_provider()
+    except ValueError as e:
+        return JSONResponse({"error": str(e) + " → Провайдеры → Muse Spark → Save"}, status_code=400)
+
     if agent_status["state"] == "running":
         return JSONResponse({"error": "Agent is already running"}, status_code=409)
 
