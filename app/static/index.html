@@ -192,7 +192,19 @@ input[type="text"],input[type="password"],textarea,select{width:100%;padding:10p
 input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
 .muted{color:var(--text-dim)}
 .small{font-size:11px}
-.divider{height:1px;background:var(--border-soft);margin:12px 0}
+.artifact-tabs{display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:10px;border:1px solid var(--border);position:sticky;top:0;z-index:5}
+.atab{flex:1;padding:8px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;border:none;color:var(--text-dim);transition:.15s}
+.atab.active{background:var(--accent);color:#062015}
+.atab-panel{display:none;flex-direction:column;gap:12px}
+.atab-panel.active{display:flex}
+.artifacts-scroll{flex:1;overflow:auto;display:flex;flex-direction:column;gap:12px;min-height:0}
+.card.compact{padding:12px}
+.card.compact .card-head{margin-bottom:8px}
+.pipeline-vertical.compact .pv-step{padding:6px 0}
+.pipeline-vertical.compact .pv-icon{width:26px;height:26px;font-size:12px}
+.pipeline-vertical.compact .pv-title{font-size:12px}
+.pipeline-vertical.compact .pv-desc{font-size:10px}
+.divider{height:1px;background:var(--border-soft);margin:10px 0}
 /* Responsive */
 @media(max-width:1100px){
   .artifacts-pane{width:380px}
@@ -287,14 +299,21 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
   <div class="separator" id="separator" title="Потяни чтобы изменить ширину"></div>
 
   <!-- RIGHT: Artifacts -->
-  <aside class="artifacts-pane">
+  <aside class="artifacts-pane" style="display:flex;flex-direction:column;gap:10px;padding:12px">
+    <div class="artifact-tabs">
+      <button class="atab active" data-atab="process" onclick="switchAtab('process')">Процесс</button>
+      <button class="atab" data-atab="results" onclick="switchAtab('results')">Результаты</button>
+      <button class="atab" data-atab="format" onclick="switchAtab('format')">Формат</button>
+    </div>
+    <div class="artifacts-scroll" id="artifactsScroll">
+    <div class="atab-panel active" id="atab-process">
     <!-- Workflow -->
-    <div class="card">
+    <div class="card compact">
       <div class="card-head">
         <div class="card-title"><span class="dot"></span> Рабочий процесс агента</div>
         <span id="workflowStatus" class="small muted">ожидание</span>
       </div>
-      <div class="pipeline-vertical" id="pipelineVertical">
+      <div class="pipeline-vertical compact" id="pipelineVertical">
         <div class="pv-step" data-pv="1">
           <div class="pv-icon">📦</div>
           <div class="pv-content">

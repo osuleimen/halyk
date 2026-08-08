@@ -428,15 +428,32 @@ async def api_run(req: RunRequest, request: Request):
     # проверяем статус из файла (для Celery-совместимости)
     _load_status_file()
     if agent_status.get("state") == "running":
-        # защита от двойного запуска — проверим свежий файл
-        # если файл старше 1 часа считаем зависшим и разрешаем перезапуск
+        # защита от двойного запуска — но считаем зависшим если:
+        # - старше 3 минут ИЛИ
+        # - started_at отсутствует / битый ИЛИ
+        # - progress==0 и current_scenario None дольше 60 сек (завис на старте)
         try:
             started = agent_status.get("started_at")
             if started:
                 dt = datetime.fromisoformat(started)
-                if (datetime.now() - dt).total_seconds() < 3600:
+                age = (datetime.now() - dt).total_seconds()
+                is_stuck_start = age > 60 and agent_status.get("progress", 0) == 0 and not agent_status.get("current_scenario")
+                if age < 180 and not is_stuck_start:
                     return JSONResponse({"error": "Agent is already running"}, status_code=409)
-        except Exception:
+                if is_stuck_start:
+                    logger.warning(f"Stuck running detected (age {age:.0f}s, progress 0) — auto-reset to idle")
+                    agent_status["state"] = "idle"
+                    _save_status_file()
+                elif age >= 180:
+                    logger.warning(f"Running too long ({age:.0f}s) — allow restart (previous run considered stale)")
+                    # разрешаем перезапуск, не возвращаем 409
+                    pass
+                else:
+                    return JSONResponse({"error": "Agent is already running"}, status_code=409)
+            else:
+                return JSONResponse({"error": "Agent is already running"}, status_code=409)
+        except Exception as e:
+            logger.warning(f"Status check failed: {e}")
             return JSONResponse({"error": "Agent is already running"}, status_code=409)
 
     scenarios = req.scenarios or SCENARIOS
@@ -546,6 +563,19 @@ async def api_run(req: RunRequest, request: Request):
     thread.start()
     return {"status": "started", "executor": "threading", "scenarios": scenarios}
 
+
+@app.post("/api/reset")
+async def api_reset(request: Request):
+    """Сброс зависшего running → idle (для хакатона)."""
+    global agent_status
+    _load_status_file()
+    agent_status["state"] = "idle"
+    agent_status["progress"] = 0
+    agent_status["current_scenario"] = None
+    agent_status["error"] = None
+    _save_status_file()
+    broadcast_log("🔄 Статус сброшен в idle (ручной reset)")
+    return {"ok": True, "status": agent_status}
 
 @app.get("/api/status")
 async def api_status():
