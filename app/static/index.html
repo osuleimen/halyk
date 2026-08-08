@@ -400,6 +400,18 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);
   </div>
 </div>
 
+<!-- Floating Halyk AI — глобальный чат (был потерян при редизайне, возвращён) -->
+<button id="halykFab" onclick="openGlobalChat()" style="position:fixed;right:16px;bottom:16px;z-index:900;width:56px;height:56px;border-radius:50%;background:var(--accent);color:#062015;border:none;box-shadow:0 8px 24px #00000044;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center">💬</button>
+<div class="modal-overlay" id="globalChatModal">
+  <div class="modal" style="max-width:640px">
+    <h2>🤖 Halyk AI — главный копilot</h2>
+    <p style="font-size:11px;color:var(--text-dim)">Спроси про любой сценарий, попроси запустить анализ или сменить модель. Пиши: <code>запусти P6</code> или <code>смени на deepseek</code>.</p>
+    <div id="globalChatHistory" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.6"><div style="color:var(--text-dim);text-align:center;margin-top:90px">Привет! Я Halyk AI. Чем помочь?</div></div>
+    <div style="display:flex;gap:8px;margin-top:12px"><input type="text" id="globalChatInput" placeholder="Напиши: запусти P6, смени модель, что с ковенантом?" style="margin:0;flex:1" onkeypress="if(event.key==='Enter')sendGlobalChat()"/><button class="btn-primary" onclick="sendGlobalChat()" id="btnGlobalSend">Отправить</button></div>
+    <div class="modal-buttons" style="margin-top:12px"><button class="btn-secondary" onclick="document.getElementById('globalChatModal').style.display='none'">Закрыть</button></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="chatModal">
   <div class="modal" style="max-width:640px">
     <h2>💬 Halyk AI — обсуждение ковенанта</h2>
@@ -565,6 +577,28 @@ async function sendChatMessage(){
     const data=await res.json();
     if(data.error) historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--breach-dim);padding:9px 12px;border-radius:12px 12px 12px 0;max-width:85%;color:var(--breach)"><b>Ошибка:</b><br>${escapeHtml(data.error)}</div>`;
     else historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--accent-dim);padding:9px 12px;border-radius:12px 12px 12px 0;max-width:85%;border:1px solid #1DB95433"><b>🤖 Агент:</b><br>${data.reply.replace(/\n/g,'<br>')}</div>`;
+  }catch(e){historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--breach-dim);padding:9px 12px;border-radius:12px">Ошибка сети: ${e.message}</div>`;}
+  finally{inputEl.disabled=false;btnEl.disabled=false;btnEl.innerHTML='Отправить';historyEl.scrollTop=historyEl.scrollHeight;setTimeout(()=>inputEl.focus(),80);}
+}
+function openGlobalChat(){document.getElementById('globalChatModal').style.display='flex';setTimeout(()=>document.getElementById('globalChatInput').focus(),90)}
+async function sendGlobalChat(){
+  const inputEl=document.getElementById('globalChatInput'),btnEl=document.getElementById('btnGlobalSend'),historyEl=document.getElementById('globalChatHistory');
+  const message=inputEl.value.trim();if(!message) return;
+  if(historyEl.innerHTML.includes('Привет! Я Halyk AI')) historyEl.innerHTML='';
+  historyEl.innerHTML+=`<div style="align-self:flex-end;background:var(--surface2);border:1px solid var(--border);padding:9px 12px;border-radius:12px 12px 0 12px;max-width:85%"><b>Вы:</b><br>${escapeHtml(message)}</div>`;
+  inputEl.value='';historyEl.scrollTop=historyEl.scrollHeight;inputEl.disabled=true;btnEl.disabled=true;btnEl.innerHTML='<span class="loading-spinner"></span>';
+  try{
+    const res=await fetch('/api/global_chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message})});
+    const data=await res.json();
+    if(data.error) historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--breach-dim);padding:9px 12px;border-radius:12px 12px 12px 0;max-width:85%;color:var(--breach)"><b>Ошибка:</b><br>${escapeHtml(data.error)}</div>`;
+    else {
+      let reply=data.reply.replace(/\n/g,'<br>');
+      // подсветить ACTION теги если есть
+      if(reply.includes('[ACTION')) reply=reply.replace(/\[ACTION:[^\]]+\]/g,m=>`<code style="background:var(--surface2);padding:2px 6px;border-radius:4px;font-size:10px">${escapeHtml(m)}</code>`);
+      historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--accent-dim);padding:9px 12px;border-radius:12px 12px 12px 0;max-width:85%;border:1px solid #1DB95433"><b>🤖 Halyk AI:</b><br>${reply}</div>`;
+      // если был ACTION — обновить статус
+      if(data.reply.includes('[ACTION')) { setTimeout(()=>{refreshAll();loadProviders();},800); }
+    }
   }catch(e){historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--breach-dim);padding:9px 12px;border-radius:12px">Ошибка сети: ${e.message}</div>`;}
   finally{inputEl.disabled=false;btnEl.disabled=false;btnEl.innerHTML='Отправить';historyEl.scrollTop=historyEl.scrollHeight;setTimeout(()=>inputEl.focus(),80);}
 }
