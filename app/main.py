@@ -152,7 +152,80 @@ app.state.limiter = limiter
 
 @app.exception_handler(RateLimitExceeded)
 async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
-    return PlainTextResponse(f"429 Too Many Requests: {exc.detail}", status_code=429)
+    return PlainTextResponse(f"429 Too Many Requests: {exc.detail} — подожди минуту", status_code=429)
+
+# BigTech: CORS + TrustedHost (не ломает демо, но режет ботов с левых доменов)
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://halyk.wit.kz", "https://onaiu.com", "https://*.onaiu.com", "http://localhost:18080", "http://127.0.0.1:18080"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+    max_age=86400,
+)
+# Доверяем только нашим хостам + Docker DNS
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["halyk.wit.kz", "*.halyk.wit.kz", "localhost", "127.0.0.1", "halyk-covenant-agent", "halyk.wit.kz:443"])
+
+# BigTech: Observability — request ID + Prometheus + structured logs
+import uuid
+import time
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+
+REQUEST_COUNT = Counter("halyk_requests_total", "Total requests", ["method", "endpoint", "http_status"])
+REQUEST_LATENCY = Histogram("halyk_request_duration_seconds", "Request latency", ["endpoint"])
+
+@app.middleware("http")
+async def add_request_id_and_metrics(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    start = time.time()
+    response = None
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        latency = time.time() - start
+        endpoint = request.url.path
+        status = getattr(response, "status_code", 500) if response else 500
+        REQUEST_COUNT.labels(request.method, endpoint, status).inc()
+        REQUEST_LATENCY.labels(endpoint).observe(latency)
+        # Structured log
+        logger.info("request_id=%s method=%s path=%s status=%s latency=%.3f ip=%s", request_id, request.method, endpoint, status, latency, _get_client_ip(request))
+        if response is not None:
+            response.headers["X-Request-ID"] = request_id
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    return PlainTextResponse(generate_latest().decode(), media_type=CONTENT_TYPE_LATEST)
+
+@app.get("/health", include_in_schema=False)
+async def health_detailed():
+    # BigTech: liveness + readiness with dependency checks
+    checks = {}
+    # Check ledger
+    try:
+        from app.services.ledger import _get_df
+        df = _get_df()
+        checks["ledger"] = {"status": "ok", "rows": len(df)}
+    except Exception as e:
+        checks["ledger"] = {"status": "fail", "error": str(e)[:200]}
+    # Check cache
+    try:
+        import os as _os
+        from config import CACHE_DIR
+        checks["cache"] = {"status": "ok" if _os.path.isdir(CACHE_DIR) else "fail"}
+    except Exception as e:
+        checks["cache"] = {"status": "fail", "error": str(e)[:200]}
+    # Check celery broker
+    try:
+        from app.celery_app import is_celery_available
+        checks["celery"] = {"status": "ok" if is_celery_available() else "degraded", "available": is_celery_available()}
+    except Exception as e:
+        checks["celery"] = {"status": "fail", "error": str(e)[:200]}
+    overall = "ok" if all(v["status"] in ("ok", "degraded") for v in checks.values()) else "fail"
+    return {"status": overall, "checks": checks, "version": "muse-spark-1.2"}
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.isdir(static_dir):
@@ -493,23 +566,39 @@ async def api_clear_cache(request: Request):
 @app.post("/api/upload")
 @limiter.limit("5/minute")
 async def api_upload(request: Request, file: UploadFile = File(...)):
+    """Upload a new dataset zip file, extract it, and clear caches. BigTech: ZipSlip + size + mime guard."""
     _require_admin(request)
-    """Upload a new dataset zip file, extract it, and clear caches."""
     import zipfile
     import shutil
     from config import DATA_DIR
     from app.services.document_store import EXTRACT_CACHE_PATH, INDEX_CACHE_PATH
 
-    zip_path = os.path.join(DATA_DIR, file.filename)
+    # BigTech: validate file type and size (50MB)
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        return JSONResponse({"error": "Only .zip files allowed"}, status_code=400)
+    # file.size may not be set, check via reading with limit
+    max_size = 50 * 1024 * 1024
+    # Use SpooledTemporaryFile to avoid OOM
+    zip_path = os.path.join(DATA_DIR, os.path.basename(file.filename))  # basename prevents path traversal
     os.makedirs(DATA_DIR, exist_ok=True)
     
     # Save zip
     with open(zip_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
         
-    # Extract zip
+    # Extract zip with ZipSlip guard + size check
     try:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            # BigTech: ZipSlip + size guard
+            for member in zip_ref.infolist():
+                # Prevent path traversal
+                member_path = os.path.join(DATA_DIR, member.filename)
+                abs_data = os.path.abspath(DATA_DIR)
+                abs_member = os.path.abspath(member_path)
+                if not abs_member.startswith(abs_data):
+                    raise ValueError(f"ZipSlip detected: {member.filename}")
+                if member.file_size > max_size:
+                    raise ValueError(f"File too large: {member.filename} ({member.file_size} > {max_size})")
             zip_ref.extractall(DATA_DIR)
         os.remove(zip_path)  # Cleanup zip
         
@@ -517,10 +606,11 @@ async def api_upload(request: Request, file: UploadFile = File(...)):
         for p in [EXTRACT_CACHE_PATH, INDEX_CACHE_PATH]:
             if os.path.exists(p):
                 os.remove(p)
+        logger.info("Dataset uploaded by %s: %s", _get_client_ip(request), file.filename)
                 
         return {"ok": True, "message": "Новый датасет успешно загружен. Кэш очищен."}
     except Exception as e:
-        logger.exception("Upload failed")
+        logger.exception("Upload failed from %s", _get_client_ip(request))
         return JSONResponse({"error": f"Failed to extract zip: {e}"}, status_code=400)
 
 

@@ -1,0 +1,30 @@
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+select = ["E", "F", "W", "C90", "I", "N", "UP", "S", "B", "A", "C4", "T20"]
+ignore = ["S101", "S603", "S607"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short --strict-markers"
+
+[project]
+name = "halyk-covenant-agent"
+version = "1.2.0"
+description = "Halyk Covenant Agent — Muse Spark + Gemini Vision"
+requires-python = ">=3.13"

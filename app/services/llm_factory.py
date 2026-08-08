@@ -74,30 +74,22 @@ def create_llm(
 
     elif ptype == "openai_compat":
         from langchain_openai import ChatOpenAI
+        import time
+
         base_url = provider_config.get("base_url", "https://api.openai.com/v1")
 
-        class _SafeChatOpenAI(ChatOpenAI):
-            """Враппер: muse-spark иногда отдаёт content как tuple/list — нормализуем, ретрай на 404."""
-            def invoke(self, *args, **kwargs):
-                try:
-                    resp = super().invoke(*args, **kwargs)
-                except Exception as e:
-                    # tuple index out of range — пробуем без tools (простой чат)
-                    if "tuple" in str(e).lower() and "index" in str(e).lower():
-                        logger.warning("OpenAI-compat tuple error, retry without tools: %s", e)
-                        # fallback: простой вызов без инструментов
-                        try:
-                            # убираем tools из kwargs если есть
-                            kwargs.pop("tools", None)
-                            return super().invoke(*args, **kwargs)
-                        except Exception as e2:
-                            raise e2
-                    raise
-                # нормализуем content если вдруг tuple/list
+        class _ResilientChatOpenAI(ChatOpenAI):
+            """BigTech: muse-spark иногда отдаёт content как tuple/list + 404/429 — ретраи, нормализация, fallback."""
+
+            def _normalize_content(self, resp):
+                """Нормализуем content к str, независимо от API (str|list|tuple|dict)."""
                 try:
                     c = getattr(resp, "content", None)
+                    if c is None:
+                        return resp
+                    if isinstance(c, str):
+                        return resp
                     if isinstance(c, (list, tuple)):
-                        # склеиваем
                         parts = []
                         for x in c:
                             if isinstance(x, str):
@@ -105,13 +97,53 @@ def create_llm(
                             elif isinstance(x, dict):
                                 parts.append(x.get("text") or x.get("content") or "")
                             else:
-                                parts.append(getattr(x, "text", "") or getattr(x, "content", "") or str(x))
+                                # AIMessage chunk
+                                txt = getattr(x, "text", None) or getattr(x, "content", None)
+                                if txt is None and isinstance(x, dict):
+                                    txt = x.get("text", "")
+                                parts.append(str(txt) if txt is not None else "")
                         resp.content = "".join(parts) if parts else ""
-                except Exception:
-                    pass
+                    elif hasattr(c, "content"):
+                        resp.content = self._normalize_content(c).content if hasattr(c, "content") else str(c)
+                except Exception as e:
+                    logger.warning("Content normalization failed: %s", e)
                 return resp
 
-        llm = _SafeChatOpenAI(
+            def invoke(self, *args, **kwargs):
+                # Circuit breaker: если 404 на модель — пробуем fallback без tools
+                last_err = None
+                for attempt in range(2):
+                    try:
+                        resp = super().invoke(*args, **kwargs)
+                        return self._normalize_content(resp)
+                    except Exception as e:
+                        msg = str(e).lower()
+                        last_err = e
+                        # 404/NotFound — модель не существует, пробуем без tools или с другой моделью
+                        if "404" in msg or "not_found" in msg or "not found" in msg:
+                            logger.warning("OpenAI-compat 404 on %s (attempt %d): %s", model_name, attempt, e)
+                            if attempt == 0:
+                                kwargs.pop("tools", None)
+                                kwargs.pop("tool_choice", None)
+                                time.sleep(0.5)
+                                continue
+                        # tuple index — баг сериализации muse-spark, ретрай без tools
+                        if "tuple" in msg and "index" in msg:
+                            logger.warning("OpenAI-compat tuple error, retry without tools: %s", e)
+                            kwargs.pop("tools", None)
+                            kwargs.pop("tool_choice", None)
+                            if attempt == 0:
+                                time.sleep(0.5)
+                                continue
+                        # 429 — rate limit, не ретраим тут (slowapi уже режет)
+                        raise
+                raise last_err if last_err else RuntimeError("LLM invoke failed")
+
+            async def ainvoke(self, *args, **kwargs):
+                # Для ainvoke — синхронный fallback
+                return self.invoke(*args, **kwargs)
+
+        llm = _ResilientChatOpenAI(
             model=model_name,
             openai_api_key=api_key,
             openai_api_base=base_url,

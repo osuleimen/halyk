@@ -34,6 +34,12 @@ try:
         task_time_limit=3600,
         task_soft_time_limit=3300,
         worker_prefetch_multiplier=1,
+        worker_max_tasks_per_child=50,
+        task_acks_late=True,
+        task_reject_on_worker_lost=True,
+        task_ignore_result=False,
+        result_expires=3600,
+        broker_transport_options={"visibility_timeout": 3600, "max_retries": 3},
         beat_schedule={
             # Автоматическая проверка сертификата halyk.wit.kz — не мешает хостовому celery beat
             "halyk-cert-renew-check": {
