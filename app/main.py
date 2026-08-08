@@ -475,11 +475,16 @@ class ChatRequest(BaseModel):
 @app.post("/api/chat")
 async def api_chat(req: ChatRequest):
     providers = load_providers()
-    active_pid = next((pid for pid, p in providers.items() if p.get("enabled")), "gemini")
-    active_cfg = providers.get(active_pid)
+    # Чат — строго через Muse Spark, Gemini только Vision fallback (не чат)
+    from config import get_active_provider as _gap
+    try:
+        active_pid, active_cfg = _gap()
+    except ValueError:
+        active_pid = next((pid for pid, p in providers.items() if p.get("enabled") and p.get("api_key")), "muse_spark")
+        active_cfg = providers.get(active_pid)
     
     if not active_cfg or not active_cfg.get("api_key"):
-        return JSONResponse({"error": "Включите и настройте провайдера LLM (например, Gemini или DeepSeek)."}, status_code=400)
+        return JSONResponse({"error": "Включите и настройте провайдера LLM (Muse Spark — основной, Gemini — Vision)."}, status_code=400)
     
     try:
         from app.services.llm_factory import create_llm
@@ -526,11 +531,15 @@ class GlobalChatRequest(BaseModel):
 @app.post("/api/global_chat")
 async def api_global_chat(req: GlobalChatRequest):
     providers = load_providers()
-    active_pid = next((pid for pid, p in providers.items() if p.get("enabled")), "gemini")
-    active_cfg = providers.get(active_pid)
+    from config import get_active_provider as _gap2
+    try:
+        active_pid, active_cfg = _gap2()
+    except ValueError:
+        active_pid = next((pid for pid, p in providers.items() if p.get("enabled") and p.get("api_key")), "muse_spark")
+        active_cfg = providers.get(active_pid)
     
     if not active_cfg or not active_cfg.get("api_key"):
-        return JSONResponse({"error": "Включите и настройте провайдера LLM (например, Gemini или DeepSeek)."}, status_code=400)
+        return JSONResponse({"error": "Включите и настройте провайдера LLM (Muse Spark — основной, Gemini — Vision)."}, status_code=400)
     
     try:
         from app.services.llm_factory import create_llm

@@ -25,13 +25,24 @@ CONTACT_EMAIL = "info@wit.kz"
 PROVIDERS_PATH = os.path.join(CACHE_DIR, "providers.json")
 
 DEFAULT_PROVIDERS = {
+    "muse_spark": {
+        "name": "Meta Muse Spark",
+        "type": "openai_compat",
+        "api_key": "",
+        "base_url": "https://api.meta.ai/v1",
+        "models": {
+            "fast": "muse-spark-1.2-contributor",
+            "pro": "muse-spark-1.2-contributor",
+        },
+        "enabled": True,
+    },
     "gemini": {
         "name": "Google Gemini",
-        "type": "gemini",              # native google-genai — fallback only
+        "type": "gemini",              # Vision fallback only — чат его не использует
         "api_key": "",
         "models": {
-            "fast": "gemini-2.5-flash",
-            "pro": "gemini-2.5-pro",
+            "fast": "gemini-2.0-flash",
+            "pro": "gemini-1.5-pro",
         },
         "enabled": False,
     },
@@ -45,17 +56,6 @@ DEFAULT_PROVIDERS = {
             "pro": "deepseek-v4-flash",
         },
         "enabled": False,
-    },
-    "muse_spark": {
-        "name": "Meta Muse Spark",
-        "type": "openai_compat",
-        "api_key": "",
-        "base_url": "https://api.meta.ai/v1",
-        "models": {
-            "fast": "muse-spark-1.2-contributor",
-            "pro": "muse-spark-1.2-contributor",
-        },
-        "enabled": True,
     },
     "openai": {
         "name": "OpenAI",
@@ -91,6 +91,23 @@ def load_providers() -> dict:
         for k, v in DEFAULT_PROVIDERS.items():
             if k not in saved:
                 saved[k] = v
+        # Миграция устаревших моделей Gemini 2.5 → 2.0 (404 NOT_FOUND для новых юзеров)
+        if "gemini" in saved and "models" in saved["gemini"]:
+            m = saved["gemini"]["models"]
+            if m.get("fast") == "gemini-2.5-flash":
+                m["fast"] = "gemini-2.0-flash"
+            if m.get("pro") == "gemini-2.5-pro":
+                m["pro"] = "gemini-1.5-pro"
+            # если модель всё ещё 2.5 — форсим дефолт
+            if "2.5" in m.get("fast",""):
+                m["fast"] = DEFAULT_PROVIDERS["gemini"]["models"]["fast"]
+            if "2.5" in m.get("pro",""):
+                m["pro"] = DEFAULT_PROVIDERS["gemini"]["models"]["pro"]
+            # сохраняем миграцию
+            try:
+                save_providers(saved)
+            except Exception:
+                pass
         return saved
 
     # First run — try loading Gemini key from api.txt
@@ -114,8 +131,18 @@ def save_providers(providers: dict):
 
 
 def get_active_provider() -> tuple[str, dict]:
-    """Get the first enabled provider with a key. Returns (provider_id, config)."""
+    """Get the first enabled provider with a key. Muse Spark приоритет — чат не должен уходить в Gemini."""
     providers = load_providers()
+    # Приоритет: muse_spark > остальные (gemini только для Vision, не для чата)
+    if "muse_spark" in providers and providers["muse_spark"].get("enabled") and providers["muse_spark"].get("api_key"):
+        return "muse_spark", providers["muse_spark"]
+    for pid, cfg in providers.items():
+        if cfg.get("enabled") and cfg.get("api_key"):
+            # пропускаем gemini для чата если есть muse_spark без ключа — gemini остаётся fallback
+            if pid == "gemini" and "muse_spark" in providers and providers["muse_spark"].get("enabled"):
+                continue
+            return pid, cfg
+    # если muse_spark без ключа но enabled — всё равно пробуем (fallback на gemini)
     for pid, cfg in providers.items():
         if cfg.get("enabled") and cfg.get("api_key"):
             return pid, cfg
