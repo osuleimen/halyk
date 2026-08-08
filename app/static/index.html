@@ -192,7 +192,8 @@ input[type="text"],input[type="password"],textarea,select{width:100%;padding:10p
 input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
 .muted{color:var(--text-dim)}
 .small{font-size:11px}
-.artifact-tabs{display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:10px;border:1px solid var(--border);position:sticky;top:0;z-index:5}
+.artifact-tabs{display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:12px;border:1px solid var(--border);position:sticky;top:0;z-index:5;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+.atab.active{box-shadow:0 2px 8px rgba(0,192,112,.35)}
 .atab{flex:1;padding:8px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;border:none;color:var(--text-dim);transition:.15s}
 .atab.active{background:var(--accent);color:#062015}
 .atab-panel{display:none;flex-direction:column;gap:12px}
@@ -249,6 +250,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
   </div>
   <div class="header-actions">
     <input type="file" id="zipInput" accept=".zip" style="display:none">
+    <button class="btn btn-ghost" onclick="resetAll()" title="Общий ресет: чистит кэш, ответы, статус"><span>🧹</span> <span class="label">Сброс</span></button>
     <button class="btn btn-ghost" onclick="triggerUpload()"><span>📁</span> <span class="label">ZIP</span></button>
     <button class="btn btn-secondary" id="btnRun" onclick="runAgent()"><span id="runIcon">▶</span> <span class="label">Запустить</span></button>
     <button class="btn btn-ghost" onclick="downloadSubmission()">⬇ <span class="label">Скачать</span></button>
@@ -358,7 +360,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
           <div class="pv-icon">✅</div>
           <div class="pv-content">
             <div class="pv-title">6. Формирует ответ с доказательствами</div>
-            <div class="pv-desc"><code>submission.json</code> с reasoning и <code>evidence_txn_id</code></div>
+            <div class="pv-desc"><code>submission.json</code> — 3 поля: <code>status</code> / <code>actual</code> / <code>evidence_txn_id</code> • <code>reasoning</code> только внутри артефактов</div>
             <div class="pv-status">ожидание</div>
           </div>
         </div>
@@ -670,8 +672,12 @@ function startPolling(){
       document.getElementById('btnRun').disabled=false;
       document.getElementById('runIcon').textContent='▶';
       if(s.state==='done'){
-        appendAgent('✅ Анализ завершён. Результаты и reasoning — справа в артефактах. Скачай submission.json или спроси про любой ковенант.');
+        appendAgent('✅ Анализ завершён — открываю Результаты. Скачай submission.json или спроси про любой ковенант.');
+        switchAtab('results');
+        await loadAnswers(false);
         await evaluate();
+        // красиво — подсветить новую вкладку
+        document.getElementById('atab-results')?.scrollIntoView({behavior:'smooth', block:'nearest'});
       } else if(s.state==='error'){
         appendSystem('❌ Ошибка: '+(s.error||'неизвестно'));
       }
@@ -872,9 +878,18 @@ async function runAgent(scenarios=null){
   }
 }
 
-// Upload
+// Upload + общий ресет
 function triggerUpload(){
   document.getElementById('zipInput').click();
+}
+async function resetAll(){
+  if(!confirm('Общий ресет: очистить кэш, ответы, submission и сбросить статус? Датасет останется, но кэш пересоздастся.')) return;
+  try{
+    const r=await fetch('/api/reset_all',{method:'POST',headers:{...adminHeaders()}});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok){ showToast('Сброс выполнен 🧹'); appendSystem('🧹 Общий ресет выполнен — загрузи датасет заново или сразу жми Запустить'); await refreshAll(); document.getElementById('liveLog').textContent='жду запуска…'; document.getElementById('datasetInfo').textContent='agentic-bank-public • перетащи ZIP сюда или кликни'; }
+    else { showToast(d.error||'Ошибка сброса','error'); }
+  }catch(e){ showToast('Ошибка сети','error'); }
 }
 document.getElementById('zipInput').addEventListener('change', async (e)=>{
   const file=e.target.files[0];
@@ -887,10 +902,10 @@ document.getElementById('zipInput').addEventListener('change', async (e)=>{
     const r=await fetch('/api/upload',{method:'POST',headers:{...adminHeaders()},body:fd});
     const data=await r.json().catch(()=>({}));
     if(data.ok||r.ok){
-      showToast('Датасет загружен');
-      appendSystem('✅ Датасет загружен — кэш очищен. Запускаю анализ…');
+      showToast('Датасет загружен — выбери сценарии и нажми Запустить');
+      appendSystem('✅ Датасет загружен — кэш очищен. Теперь выбери: ▶ Запустить все или Быстрый тест P1–P3. Артефакты покажут прогресс.');
       document.getElementById('datasetInfo').textContent=file.name+' • загружен';
-      runAgent();
+      await refreshAll();
     } else {
       showToast(data.error||'Ошибка загрузки','error');
       appendSystem('❌ '+ (data.error||'Ошибка'));

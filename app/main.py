@@ -577,6 +577,62 @@ async def api_reset(request: Request):
     broadcast_log("🔄 Статус сброшен в idle (ручной reset)")
     return {"ok": True, "status": agent_status}
 
+@app.post("/api/reset_all")
+async def api_reset_all(request: Request):
+    """Общий ресет: чистит кэш документов и статус, но НЕ трогает submission.json по умолчанию (чтобы результат не исчезал)."""
+    global agent_status, agent_answers, agent_logs
+    hard = request.query_params.get("hard") == "1"
+    _load_status_file()
+    agent_status = {"state": "idle", "current_scenario": None, "progress": 0, "total": len(SCENARIOS), "started_at": None, "error": None}
+    agent_answers.clear()
+    agent_logs.clear()
+    _save_status_file()
+    # чистим файлы кэша, submission — только если hard=1
+    for p in [INTERNAL_ANSWERS_PATH, LOGS_FILE_PATH]:
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+        except Exception:
+            pass
+    from app.services.document_store import EXTRACT_CACHE_PATH, INDEX_CACHE_PATH
+    cache_only = [EXTRACT_CACHE_PATH, INDEX_CACHE_PATH]
+    if hard:
+        cache_only.append(OUTPUT_PATH)
+    for p in cache_only:
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+        except Exception:
+            pass
+    if hard:
+        try:
+            import shutil
+            if os.path.exists(TEMPLATE_PATH):
+                shutil.copy(TEMPLATE_PATH, OUTPUT_PATH)
+        except Exception as e:
+            logger.warning(f"reset_all hard copy failed: {e}")
+    else:
+        broadcast_log("🧹 Сброс: кэш и статус очищены, submission.json сохранён. Для полной очистки добавь ?hard=1")
+    # чистим вложенные дубликаты agentic-bank-public/agentic-bank-public если есть
+    try:
+        import pathlib
+        nested = pathlib.Path(DATA_DIR) / pathlib.Path(DATA_DIR).name
+        if nested.exists() and nested.is_dir():
+            import shutil as _sh
+            # переносим содержимое наружу если там documents
+            for item in nested.iterdir():
+                target = pathlib.Path(DATA_DIR) / item.name
+                if not target.exists():
+                    _sh.move(str(item), str(target))
+            try:
+                nested.rmdir()
+            except Exception:
+                pass
+    except Exception as e:
+        logger.warning(f"nested cleanup failed: {e}")
+    broadcast_log("🧹 Общий ресет: кэш, ответы, submission — очищены. Загрузи датасет → выбери сценарии → Запустить")
+    return {"ok": True}
+
 @app.get("/api/status")
 async def api_status():
     _load_status_file()
