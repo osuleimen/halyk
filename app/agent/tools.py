@@ -358,15 +358,6 @@ def submit_answer(
     reasoning: Optional[str] = None,
     graph_mermaid: Optional[str] = None,
 ) -> str:
-    # Normalize evidence: string "null"/"None"/empty → real None
-    if isinstance(evidence_txn_id, str):
-        _ev = evidence_txn_id.strip()
-        if _ev.lower() in ("null", "none", "", "-"):
-            evidence_txn_id = None
-        elif not _ev.startswith("TXN-"):
-            # invalid txn id format → treat as None
-            if _ev.lower().startswith("txn-") is False and len(_ev) < 5:
-                evidence_txn_id = None
     """Зафиксировать ответ по ковенанту.
 
     Args:
@@ -380,6 +371,14 @@ def submit_answer(
     Returns:
         Подтверждение записи.
     """
+    # Normalize evidence: string "null"/"None"/empty → real None
+    if isinstance(evidence_txn_id, str):
+        _ev = evidence_txn_id.strip()
+        if _ev.lower() in ("null", "none", "", "-"):
+            evidence_txn_id = None
+        elif not _ev.startswith("TXN-"):
+            if _ev.lower().startswith("txn-") is False and len(_ev) < 5:
+                evidence_txn_id = None
     # Validate
     if status not in ("COMPLIANT", "BREACH"):
         return f"Ошибка: status должен быть 'COMPLIANT' или 'BREACH', получено '{status}'"

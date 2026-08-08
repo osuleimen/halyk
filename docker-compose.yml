@@ -17,16 +17,15 @@ services:
       # иначе используется внутренний halyk-redis
       - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://halyk-redis:6379/1}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://halyk-redis:6379/2}
-    depends_on:
-      - halyk-redis
     networks:
       - halyk-net
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/status',timeout=3).read()"]
-      interval: 30s
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; data=urllib.request.urlopen('http://127.0.0.1:8000/api/status',timeout=5).read(); sys.exit(0 if b'state' in data else 1)\""]
+      interval: 10s
       timeout: 5s
-      retries: 3
-      start_period: 15s
+      retries: 10
+      start_period: 40s
+      start_interval: 5s
 
   halyk-redis:
     image: redis:7-alpine
@@ -61,7 +60,7 @@ services:
       halyk-redis:
         condition: service_healthy
       halyk:
-        condition: service_healthy
+        condition: service_started
     networks:
       - halyk-net
 
