@@ -91,6 +91,78 @@ hitl_state = {
     "decision": None
 }
 
+# ── Shared state files (для Celery — общий между воркером и web) ──
+from config import CACHE_DIR
+STATUS_PATH = os.path.join(CACHE_DIR, "agent_status.json")
+INTERNAL_ANSWERS_PATH = os.path.join(CACHE_DIR, "internal_answers.json")
+LOGS_FILE_PATH = os.path.join(CACHE_DIR, "agent_logs.json")
+
+def _save_status_file():
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(STATUS_PATH, "w", encoding="utf-8") as f:
+            json.dump(agent_status, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.warning(f"save_status failed: {e}")
+
+def _load_status_file():
+    try:
+        if os.path.exists(STATUS_PATH):
+            with open(STATUS_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                # мержим свежий файл в память
+                agent_status.update(data)
+    except Exception:
+        pass
+
+def _save_answers_file():
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(INTERNAL_ANSWERS_PATH, "w", encoding="utf-8") as f:
+            json.dump(agent_answers, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.warning(f"save_answers failed: {e}")
+
+def _load_answers_file():
+    try:
+        if os.path.exists(INTERNAL_ANSWERS_PATH):
+            with open(INTERNAL_ANSWERS_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                agent_answers.update(data)
+                return True
+    except Exception:
+        pass
+    return False
+
+def _save_filtered_submission():
+    """Пишем на диск только 3 поля для сдачи — reasoning остаётся в INTERNAL_ANSWERS_PATH."""
+    try:
+        from config import TEMPLATE_PATH, OUTPUT_PATH, TEAM_NAME, CONTACT_EMAIL
+        # try to keep team/model from existing file or defaults
+        with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
+            submission = json.load(f)
+        submission["team"] = TEAM_NAME
+        submission["contact_email"] = CONTACT_EMAIL
+        try:
+            from config import get_active_provider as _gap
+            _, pcfg = _gap()
+            submission["model"] = pcfg["models"]["pro"]
+        except Exception:
+            submission["model"] = "muse-spark-1.2-contributor"
+        for sid in submission.get("answers", {}):
+            for cid in submission["answers"][sid]:
+                src = agent_answers.get(sid, {}).get(cid)
+                if src:
+                    submission["answers"][sid][cid] = {
+                        "status": src.get("status"),
+                        "actual": src.get("actual"),
+                        "evidence_txn_id": src.get("evidence_txn_id"),
+                    }
+        with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+            json.dump(submission, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"save_filtered_submission failed: {e}")
+
 # ── Metrics State ──
 HISTORY_PATH = os.path.join(os.path.dirname(__file__), "..", "cache", "history.json")
 try:
@@ -117,6 +189,13 @@ def broadcast_log(msg: str):
     agent_logs.append(line)
     if len(agent_logs) > 500:
         agent_logs.pop(0)
+    # persist logs for celery sharing
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(LOGS_FILE_PATH, "w", encoding="utf-8") as f:
+            json.dump(agent_logs[-200:], f, ensure_ascii=False)
+    except Exception:
+        pass
     for ws in ws_clients[:]:
         try:
             asyncio.get_event_loop().call_soon_threadsafe(
@@ -129,11 +208,25 @@ def broadcast_log(msg: str):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🌐 Halyk AI Challenge — Agent Server started")
-    # Load previous answers if exist
+    # Load previous answers: сначала пробуем internal (с reasoning), потом filtered submission
     from config import OUTPUT_PATH
     import json
     import os
-    if os.path.exists(OUTPUT_PATH):
+    loaded = False
+    if os.path.exists(INTERNAL_ANSWERS_PATH):
+        try:
+            with open(INTERNAL_ANSWERS_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                # internal file stores dict directly
+                if isinstance(data, dict) and "answers" not in data:
+                    agent_answers.update(data)
+                else:
+                    agent_answers.update(data.get("answers", {}))
+                loaded = True
+                logger.info(f"Loaded {len(agent_answers)} scenarios from internal_answers.json (with reasoning)")
+        except Exception as e:
+            logger.error(f"Failed to load internal_answers: {e}")
+    if not loaded and os.path.exists(OUTPUT_PATH):
         try:
             with open(OUTPUT_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -141,6 +234,16 @@ async def lifespan(app: FastAPI):
                 logger.info(f"Loaded answers for {len(agent_answers)} scenarios from submission.json")
         except Exception as e:
             logger.error(f"Failed to load submission.json on startup: {e}")
+    # load status file if exists
+    _load_status_file()
+    # load logs file
+    try:
+        if os.path.exists(LOGS_FILE_PATH):
+            with open(LOGS_FILE_PATH, "r", encoding="utf-8") as f:
+                cached_logs = json.load(f)
+                agent_logs.extend(cached_logs[-100:])
+    except Exception:
+        pass
             
     global hitl_event
     hitl_event = asyncio.Event()
@@ -160,14 +263,14 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://halyk.wit.kz", "https://onaiu.com", "https://*.onaiu.com", "http://localhost:18080", "http://127.0.0.1:18080"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
     allow_headers=["*"],
     max_age=86400,
 )
-# Доверяем только нашим хостам + Docker DNS
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["halyk.wit.kz", "*.halyk.wit.kz", "localhost", "127.0.0.1", "halyk-covenant-agent", "halyk.wit.kz:443"])
+# Доверяем только нашим хостам + Docker DNS (ослаблено для хакатона — не блокируем IP/прокси)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*", "halyk.wit.kz", "*.halyk.wit.kz", "localhost", "127.0.0.1", "halyk-covenant-agent", "halyk.wit.kz:443"])
 
 # BigTech: Observability — request ID + Prometheus + structured logs
 import uuid
@@ -314,15 +417,27 @@ async def api_run(req: RunRequest, request: Request):
     _require_admin(request)
     global agent_status, agent_answers
 
-    # BigTech: проверяем провайдер до старта, чтобы не висеть 0/12
+    # проверяем провайдер — но не блокируем демо если ключа нет: покажем понятную ошибку в чате
     try:
         from config import get_active_provider
         get_active_provider()
     except ValueError as e:
-        return JSONResponse({"error": str(e) + " → Провайдеры → Muse Spark → Save"}, status_code=400)
+        # если запустили без ключа — отдадим 400 с дружелюбным текстом, UI покажет в чате
+        return JSONResponse({"error": str(e) + " → Открой ⚙️ и добавь MUSE_SPARK_API_KEY, или задай в .env и перезапусти docker compose up -d"}, status_code=400)
 
-    if agent_status["state"] == "running":
-        return JSONResponse({"error": "Agent is already running"}, status_code=409)
+    # проверяем статус из файла (для Celery-совместимости)
+    _load_status_file()
+    if agent_status.get("state") == "running":
+        # защита от двойного запуска — проверим свежий файл
+        # если файл старше 1 часа считаем зависшим и разрешаем перезапуск
+        try:
+            started = agent_status.get("started_at")
+            if started:
+                dt = datetime.fromisoformat(started)
+                if (datetime.now() - dt).total_seconds() < 3600:
+                    return JSONResponse({"error": "Agent is already running"}, status_code=409)
+        except Exception:
+            return JSONResponse({"error": "Agent is already running"}, status_code=409)
 
     scenarios = req.scenarios or SCENARIOS
 
@@ -335,23 +450,33 @@ async def api_run(req: RunRequest, request: Request):
         "error": None,
         "initiator": req.initiator,
     }
+    _save_status_file()
     agent_logs.clear()
-
-    # --- Celery path (если на halyk.wit.kz уже есть брокер) — аккуратно, с fallback ---
+    # очистим лог файл
     try:
-        from app.celery_app import is_celery_available
-        if is_celery_available():
-            from app.tasks import run_covenant_agent
-            task = run_covenant_agent.delay(scenarios, req.initiator)
-            agent_status["celery_task_id"] = task.id
-            agent_status["executor"] = "celery"
-            logger.info("Dispatched Celery task %s for %s", task.id, scenarios)
-            broadcast_log(f"📨 Celery task {task.id[:8]} dispatched — воркер там уже крутится")
-            return {"status": "started", "executor": "celery", "task_id": task.id, "scenarios": scenarios}
-        else:
-            logger.info("Celery not available (no broker) — fallback to threading")
-    except Exception as e:
-        logger.warning("Celery dispatch failed, fallback to threading: %s", e)
+        if os.path.exists(LOGS_FILE_PATH):
+            os.remove(LOGS_FILE_PATH)
+    except Exception:
+        pass
+
+    # --- Celery path: включаем только если явно разрешён (USE_CELERY=1), иначе threading ---
+    use_celery = os.getenv("USE_CELERY", "").lower() in ("1", "true", "yes")
+    if use_celery:
+        try:
+            from app.celery_app import is_celery_available
+            if is_celery_available():
+                from app.tasks import run_covenant_agent
+                task = run_covenant_agent.delay(scenarios, req.initiator)
+                agent_status["celery_task_id"] = task.id
+                agent_status["executor"] = "celery"
+                _save_status_file()
+                logger.info("Dispatched Celery task %s for %s", task.id, scenarios)
+                broadcast_log(f"📨 Celery task {task.id[:8]} dispatched — воркер там уже крутится")
+                return {"status": "started", "executor": "celery", "task_id": task.id, "scenarios": scenarios}
+            else:
+                logger.info("Celery not available (no broker) — fallback to threading")
+        except Exception as e:
+            logger.warning("Celery dispatch failed, fallback to threading: %s", e)
 
     def _run():
         global agent_status, agent_answers
@@ -366,9 +491,12 @@ async def api_run(req: RunRequest, request: Request):
                 
                 pending = state.get("pending_scenarios", [])
                 agent_status["progress"] = agent_status["total"] - len(pending)
+                _save_status_file()
                 
                 if state.get("answers"):
                     agent_answers.update(state["answers"])
+                    _save_answers_file()
+                    _save_filtered_submission()
 
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
@@ -403,10 +531,14 @@ async def api_run(req: RunRequest, request: Request):
                 logger.error(f"Failed to calculate metrics: {e}")
 
             agent_status["state"] = "done"
+            _save_status_file()
+            _save_answers_file()
+            _save_filtered_submission()
             broadcast_log("🏁 Agent finished successfully!")
         except Exception as e:
             agent_status["state"] = "error"
             agent_status["error"] = str(e)
+            _save_status_file()
             broadcast_log(f"❌ Error: {e}")
             logger.exception("Agent error")
 
@@ -417,16 +549,45 @@ async def api_run(req: RunRequest, request: Request):
 
 @app.get("/api/status")
 async def api_status():
+    _load_status_file()
+    # также подтянем свежие логи из файла если воркер писал
+    try:
+        if os.path.exists(LOGS_FILE_PATH):
+            with open(LOGS_FILE_PATH, "r", encoding="utf-8") as f:
+                file_logs = json.load(f)
+                # мержим последние
+                for l in file_logs[-20:]:
+                    if l not in agent_logs:
+                        agent_logs.append(l)
+    except Exception:
+        pass
     return agent_status
 
 
 @app.get("/api/answers")
 async def api_answers():
+    # приоритет — внутренний кэш с reasoning
+    _load_answers_file()
+    # fallback: если внутреннего нет, но submission.json есть — отдаём его (без reasoning)
+    if not agent_answers and os.path.exists(OUTPUT_PATH):
+        try:
+            with open(OUTPUT_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("answers", {})
+        except Exception:
+            pass
     return agent_answers
 
 
 @app.get("/api/logs")
 async def api_logs():
+    # подтягиваем из файла если есть
+    try:
+        if os.path.exists(LOGS_FILE_PATH):
+            with open(LOGS_FILE_PATH, "r", encoding="utf-8") as f:
+                return {"logs": json.load(f)[-100:]}
+    except Exception:
+        pass
     return {"logs": agent_logs[-100:]}
 
 
@@ -491,13 +652,8 @@ async def api_edit_answer(req: EditAnswerRequest):
         "reasoning": req.reasoning,
         "graph_mermaid": old_data.get("graph_mermaid")
     }
-    
-    # Save to file immediately
-    try:
-        with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
-            json.dump({"answers": agent_answers}, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    _save_answers_file()
+    _save_filtered_submission()
     return {"ok": True}
 
 @app.get("/api/transaction/{scenario_id}/{txn_id}")

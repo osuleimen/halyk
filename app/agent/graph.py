@@ -220,6 +220,25 @@ def has_more_scenarios(state: AgentState) -> Literal["pick_scenario", "compile"]
 # Node: compile
 # ═══════════════════════════════════════
 
+def _filtered_cell(src: dict) -> dict:
+    """Только 3 поля для сдачи — reasoning/graph_mermaid остаются внутри агента."""
+    return {
+        "status": src.get("status"),
+        "actual": src.get("actual"),
+        "evidence_txn_id": src.get("evidence_txn_id"),
+    }
+
+def _save_internal_cache(all_answers: dict):
+    """Сохраняем полную версию с reasoning для UI (не для сдачи)."""
+    try:
+        os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+        cache_path = os.path.join(os.path.dirname(OUTPUT_PATH), "cache", "internal_answers.json")
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(all_answers, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
 def compile_submission(state: AgentState) -> dict:
     """Compile final submission.json."""
     _log("\n📦 Compiling submission.json...")
@@ -227,17 +246,23 @@ def compile_submission(state: AgentState) -> dict:
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
         submission = json.load(f)
 
-    pid, pcfg = get_active_provider()
+    try:
+        pid, pcfg = get_active_provider()
+        submission["model"] = pcfg["models"]["pro"]
+    except Exception:
+        # fallback model name if provider not configured (demo mode)
+        submission["model"] = "muse-spark-1.2-contributor"
     submission["team"] = TEAM_NAME
     submission["contact_email"] = CONTACT_EMAIL
-    submission["model"] = pcfg["models"]["pro"]
 
     answers = state.get("answers", {})
+    # сохраняем полную версию для UI
+    _save_internal_cache(answers)
     for scenario_id in submission.get("answers", {}):
         if scenario_id in answers:
             for cov_id in submission["answers"][scenario_id]:
                 if cov_id in answers[scenario_id]:
-                    submission["answers"][scenario_id][cov_id] = answers[scenario_id][cov_id]
+                    submission["answers"][scenario_id][cov_id] = _filtered_cell(answers[scenario_id][cov_id])
 
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         json.dump(submission, f, ensure_ascii=False, indent=2)
