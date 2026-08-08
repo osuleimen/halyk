@@ -30,12 +30,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message
 logger = logging.getLogger(__name__)
 
 def _content_str(c) -> str:
-    """LLM content может быть str или list[dict/str] (muse-spark) — приводим к str."""
+    """LLM content может быть str, list или tuple (muse-spark) — приводим к str."""
     if c is None:
         return ""
     if isinstance(c, str):
         return c
-    if isinstance(c, list):
+    if isinstance(c, (list, tuple)):
         parts = []
         for x in c:
             if isinstance(x, str):
@@ -43,8 +43,13 @@ def _content_str(c) -> str:
             elif isinstance(x, dict):
                 parts.append(x.get("text") or x.get("content") or str(x))
             else:
-                parts.append(getattr(x, "text", None) or str(x))
+                parts.append(getattr(x, "text", None) or getattr(x, "content", None) or str(x))
         return "".join(parts)
+    # иногда langchain отдаёт объект с .content внутри
+    if hasattr(c, "content"):
+        return _content_str(c.content)
+    if hasattr(c, "text"):
+        return str(c.text)
     return str(c)
 
 # ── Security: rate limit + optional admin token (не ломает демо, но режет ботов) ──
@@ -616,6 +621,28 @@ async def api_global_chat(req: GlobalChatRequest, request: Request):
 
 Запрос пользователя: {req.message}
 """
+    # Fallback парсинг без LLM (если LLM упал — всё равно запустим)
+    def _fallback_action(msg: str):
+        import re as _re
+        low = msg.lower()
+        # Запусти P6 / p6 запусти / запусти все
+        if "запусти" in low or "запуск" in low or "run" in low:
+            # ищем сценарии P1..P10, B1, B4 или ALL/все
+            if "все" in low or "all" in low:
+                return "RUN ALL", "Запускаю все сценарии..."
+            found = _re.findall(r'\b(P\d{1,2}|B1|B4)\b', msg.upper())
+            if found:
+                uniq = []
+                for x in found:
+                    if x not in uniq:
+                        uniq.append(x)
+                return f"RUN {','.join(uniq)}", f"Запускаю {', '.join(uniq)}..."
+        # Смени модель
+        for pid in providers.keys():
+            if pid.lower() in low and ("смен" in low or "model" in low or "модел" in low):
+                return f"SET_MODEL {pid}", f"Переключаю на {pid}..."
+        return None, None
+
     try:
         from langchain_core.messages import HumanMessage
         response = llm.invoke([HumanMessage(content=prompt)])
@@ -652,7 +679,32 @@ async def api_global_chat(req: GlobalChatRequest, request: Request):
         
         return {"reply": content}
     except Exception as e:
-        return JSONResponse({"error": f"Ошибка LLM: {str(e)}"}, status_code=500)
+        # LLM упал (tuple index и т.д.) — пробуем fallback без LLM
+        logger.warning("Global chat LLM failed, fallback parsing: %s", e)
+        fb_action, fb_reply = _fallback_action(req.message)
+        if fb_action:
+            try:
+                if fb_action.startswith("RUN"):
+                    scenarios_str = fb_action[3:].strip()
+                    if scenarios_str == "ALL":
+                        scenarios = ['P1','P2','P3','P4','P5','P6','P7','P8','P9','P10','B1','B4']
+                    else:
+                        scenarios = [s.strip() for s in scenarios_str.split(',')]
+                    if agent_status["state"] == "running":
+                        return {"reply": "⚠️ Агент уже запущен, дождитесь завершения!"}
+                    await api_run(RunRequest(scenarios=scenarios, initiator="Halyk AI (fallback)"))
+                    return {"reply": fb_reply + " ✅ (fallback без LLM)"}
+                elif fb_action.startswith("SET_MODEL"):
+                    model_id = fb_action[9:].strip()
+                    if model_id in providers:
+                        for p in providers:
+                            providers[p]["enabled"] = False
+                        providers[model_id]["enabled"] = True
+                        save_providers(providers)
+                        return {"reply": fb_reply + " ✅"}
+            except Exception as fe:
+                logger.warning("Fallback also failed: %s", fe)
+        return JSONResponse({"error": f"Ошибка LLM: {str(e)} (попробуй 'запусти P6' ещё раз — fallback тоже пробовал)"}, status_code=500)
 
 
 # ═══ WebSocket ═══
