@@ -75,7 +75,43 @@ def create_llm(
     elif ptype == "openai_compat":
         from langchain_openai import ChatOpenAI
         base_url = provider_config.get("base_url", "https://api.openai.com/v1")
-        llm = ChatOpenAI(
+
+        class _SafeChatOpenAI(ChatOpenAI):
+            """Враппер: muse-spark иногда отдаёт content как tuple/list — нормализуем, ретрай на 404."""
+            def invoke(self, *args, **kwargs):
+                try:
+                    resp = super().invoke(*args, **kwargs)
+                except Exception as e:
+                    # tuple index out of range — пробуем без tools (простой чат)
+                    if "tuple" in str(e).lower() and "index" in str(e).lower():
+                        logger.warning("OpenAI-compat tuple error, retry without tools: %s", e)
+                        # fallback: простой вызов без инструментов
+                        try:
+                            # убираем tools из kwargs если есть
+                            kwargs.pop("tools", None)
+                            return super().invoke(*args, **kwargs)
+                        except Exception as e2:
+                            raise e2
+                    raise
+                # нормализуем content если вдруг tuple/list
+                try:
+                    c = getattr(resp, "content", None)
+                    if isinstance(c, (list, tuple)):
+                        # склеиваем
+                        parts = []
+                        for x in c:
+                            if isinstance(x, str):
+                                parts.append(x)
+                            elif isinstance(x, dict):
+                                parts.append(x.get("text") or x.get("content") or "")
+                            else:
+                                parts.append(getattr(x, "text", "") or getattr(x, "content", "") or str(x))
+                        resp.content = "".join(parts) if parts else ""
+                except Exception:
+                    pass
+                return resp
+
+        llm = _SafeChatOpenAI(
             model=model_name,
             openai_api_key=api_key,
             openai_api_base=base_url,
