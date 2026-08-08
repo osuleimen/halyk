@@ -136,75 +136,122 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);
 .modal-buttons{display:flex;gap:10px;justify-content:flex-end}
 .loading-spinner{display:inline-block;width:14px;height:14px;border:2px solid #FFFFFF55;border-radius:50%;border-top-color:#fff;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-/* ===== Mobile: удобно одной рукой ===== */
+/* ===== Mobile: BigTech — корректно отображает, удобно одной рукой ===== */
 @media(max-width:900px){
   .container{grid-template-columns:1fr;gap:12px}
-  .stats-grid{grid-template-columns:repeat(2,1fr)}
-  header{flex-direction:column;align-items:flex-start;padding:12px 16px;gap:10px}
-  .halyk-title h1{font-size:15px}
-  .halyk-title p{font-size:10px}
-  .header-right{width:100%;justify-content:space-between}
-  .model-badge{font-size:10px;padding:5px 9px}
-  .tabs-wrap{padding:10px 12px 0;overflow:hidden}
-  .tabs{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap;max-width:100%}
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  header{flex-direction:column;align-items:flex-start;padding:12px 16px;gap:8px;position:sticky;top:0;z-index:100}
+  .halyk-brand{gap:10px}
+  .halyk-logo{width:38px;height:38px;font-size:16px;border-radius:9px;flex-shrink:0}
+  .halyk-title{flex:1;min-width:0}
+  .halyk-title h1{font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .halyk-title p{font-size:10px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .header-right{width:100%;justify-content:space-between;gap:6px;flex-wrap:nowrap}
+  .header-right .model-badge{flex:1;justify-content:center;min-width:0;font-size:10px;padding:6px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .header-right .model-badge small{display:none}
+  #statusBadge{flex-shrink:0;padding:6px 10px;font-size:10px}
+  .tabs-wrap{padding:8px 12px 0;overflow:hidden;position:sticky;top:64px;z-index:90;background:var(--bg);margin:0 -12px;padding-left:12px;padding-right:12px}
+  .tabs{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap;max-width:100%;gap:3px;padding:3px}
   .tabs::-webkit-scrollbar{display:none}
-  .tab{white-space:nowrap;flex:0 0 auto;padding:9px 14px;font-size:12px}
-  .tab-content{padding:12px 12px 20px}
-  .card{padding:14px;border-radius:12px}
-  .honest-banner{flex-direction:column;align-items:flex-start;gap:8px}
-  .provider-grid{grid-template-columns:1fr}
-  .log-container{height:300px}
-  .answers-table{font-size:11px}
-  .metrics-table{font-size:11px}
+  .tab{white-space:nowrap;flex:0 0 auto;padding:10px 14px;font-size:12px;min-height:40px;display:flex;align-items:center}
+  .tab-content{padding:12px 12px 80px} /* 80px для FAB */
+  .card{padding:14px;border-radius:12px;overflow:hidden}
+  .card-title{font-size:10px;margin-bottom:10px}
+  .honest-banner{flex-direction:column;align-items:flex-start;gap:10px;padding:12px}
+  .honest-banner .icon{width:32px;height:32px;font-size:16px}
+  .honest-banner div[style*="flex:1"]{width:100%}
+  .honest-banner + div{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap !important;padding-bottom:4px}
+  .honest-banner + div .chip{white-space:nowrap;flex:0 0 auto}
+  .provider-grid{grid-template-columns:1fr;gap:10px}
+  .provider-card{padding:14px}
+  .log-container{height:280px;font-size:10px}
+  .answers-table{font-size:10px}
+  .answers-table th{font-size:9px;padding:6px 6px}
+  .answers-table td{padding:7px 6px;font-size:10px}
+  .metrics-table{font-size:10px}
+  .metrics-table th{font-size:9px}
+  #halykFab{width:52px;height:52px;right:12px;bottom:12px;font-size:20px;bottom:max(12px, env(safe-area-inset-bottom))}
 }
 @media(max-width:640px){
-  header{position:sticky;top:0}
-  .halyk-logo{width:36px;height:36px;font-size:16px;border-radius:8px}
-  .halyk-brand{gap:10px}
-  .halyk-title h1{font-size:14px}
-  .controls{flex-direction:column;align-items:stretch}
-  .controls button{width:100%;min-height:44px;justify-content:center}
+  .halyk-title h1{font-size:13px}
+  .halyk-title p{-webkit-line-clamp:1}
+  .controls{flex-direction:column;align-items:stretch;gap:8px}
+  .controls button{width:100%;min-height:48px;justify-content:center;font-size:13px}
   .controls div[style*="margin-left:auto"]{margin-left:0!important;width:100%}
   .controls div[style*="margin-left:auto"] button{width:100%}
-  .score-big{font-size:36px}
-  .stat-item{padding:10px}
-  .stat-value{font-size:18px}
-  .stat-label{font-size:9px}
-  .chip{font-size:10px;padding:3px 8px}
-  button{min-height:40px}
-  .btn-small{min-height:32px}
-  .answers-table th, .answers-table td{padding:6px 7px;font-size:10px}
+  .score-big{font-size:32px;line-height:1}
+  .score-detail{font-size:11px}
+  .stat-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .stat-item{padding:12px 8px}
+  .stat-value{font-size:20px}
+  .stat-label{font-size:8px;letter-spacing:0.04em}
+  .chip{font-size:10px;padding:4px 8px;min-height:24px;display:inline-flex;align-items:center}
+  button{min-height:44px;font-size:13px}
+  .btn-small{min-height:36px;padding:6px 12px;font-size:11px}
+  .answers-table th, .answers-table td{padding:6px 6px;font-size:10px;line-height:1.3}
   .answers-table td{word-break:break-word}
-  /* таблицы — горизонтальный скролл, первая колонка липкая */
-  .card div[style*="overflow:auto"]{margin:0 -14px;padding:0 14px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .answers-table{ min-width:680px }
-  .metrics-table{ min-width:560px }
-  .modal{margin:0 8px;max-width:none;width:calc(100% - 16px);border-radius:14px;padding:16px;max-height:92vh}
-  .modal h2{font-size:16px}
-  .modal-overlay{align-items:flex-end;padding:0}
-  .modal-overlay .modal{border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:88vh}
-  #chatHistory{height:52vh!important; max-height:52vh}
-  .toast{left:12px;right:12px;bottom:12px;max-width:none;text-align:center}
-  input[type="text"],input[type="password"],textarea,select{font-size:16px} /* iOS не зумит */
+  /* таблицы — горизонтальный скролл с индикатором */
+  .card div[style*="overflow:auto"]{margin:0 -14px;padding:0 14px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;position:relative}
+  .card div[style*="overflow:auto"]::-webkit-scrollbar{height:4px}
+  .card div[style*="overflow:auto"]::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+  .answers-table{ min-width:640px; border-collapse:separate; border-spacing:0}
+  .answers-table th{position:sticky;top:0;background:var(--surface);z-index:2}
+  .answers-table td:first-child, .answers-table th:first-child{position:sticky;left:0;background:var(--surface);z-index:3;border-right:1px solid var(--border);min-width:56px}
+  .answers-table th:first-child{z-index:4}
+  .metrics-table{ min-width:520px }
+  .metrics-table th{position:sticky;top:0;background:var(--surface2);z-index:2}
+  .modal{margin:0;max-width:none;width:100%;border-radius:16px 16px 0 0;padding:16px;max-height:92vh;display:flex;flex-direction:column}
+  .modal h2{font-size:16px;margin-bottom:8px}
+  .modal p{font-size:12px;margin-bottom:12px}
+  .modal-overlay{align-items:flex-end;padding:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px)}
+  .modal-overlay .modal{border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:88vh;max-height:88dvh}
+  #chatHistory, #globalChatHistory{height:48vh!important; max-height:48vh; min-height:200px}
+  .toast{left:12px;right:12px;bottom:12px;max-width:none;text-align:center;padding:14px 16px;font-size:13px;bottom:max(12px, env(safe-area-inset-bottom))}
+  input[type="text"],input[type="password"],textarea,select{font-size:16px !important; padding:12px 14px; min-height:44px} /* iOS не зумит */
+  textarea{ min-height:80px}
+  select{ min-height:44px}
   .toggle{width:44px;height:26px}
   .toggle .slider::before{width:20px;height:20px}
+  .progress-bar{height:8px}
+  .progress-text{font-size:11px}
 }
 @media(max-width:380px){
-  .tabs{padding:3px}
-  .tab{padding:8px 10px;font-size:11px}
-  .score-big{font-size:32px}
+  header{padding:10px 12px}
+  .halyk-logo{width:32px;height:32px;font-size:14px}
+  .halyk-title h1{font-size:12px}
+  .tabs{padding:2px;gap:2px}
+  .tab{padding:8px 10px;font-size:11px;min-height:36px}
+  .score-big{font-size:28px}
   .halyk-title p{display:none}
+  .stat-value{font-size:18px}
+  #halykFab{width:48px;height:48px;right:10px;bottom:10px;font-size:18px}
 }
+@media(max-width:320px){
+  .header-right{gap:4px}
+  .model-badge{font-size:9px;padding:4px 6px}
+  #statusBadge{font-size:9px;padding:4px 8px}
+  .card{padding:12px}
+}
+/* Touch & hover refinement — BigTech */
 @media(hover:none) and (pointer:coarse){
-  button:active{transform:scale(0.98)}
-  .tab:active{transform:scale(0.98)}
+  button:active{transform:scale(0.97);transition:transform 0.1s}
+  .tab:active{transform:scale(0.97)}
+  .card:active{transform:none}
   .answers-table tr:hover{background:transparent}
   .answers-table tr:active{background:var(--surface2)}
+  .provider-card:active{transform:scale(0.98)}
+  *{-webkit-tap-highlight-color: transparent}
 }
-/* safe area для iPhone */
+/* safe area для iPhone + Dynamic Viewport */
 @supports(padding:max(0px)){
   body{padding-left:max(0px, env(safe-area-inset-left)); padding-right:max(0px, env(safe-area-inset-right))}
   .toast{padding-bottom:max(12px, env(safe-area-inset-bottom))}
+  #halykFab{bottom:max(16px, env(safe-area-inset-bottom)); right:max(16px, env(safe-area-inset-right))}
+  header{padding-top:max(12px, env(safe-area-inset-top))}
+}
+@supports(height:100dvh){
+  .modal-overlay{height:100dvh}
+  .modal{max-height:88dvh}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.1/dist/mermaid.min.js"></script>
