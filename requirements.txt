@@ -1,0 +1,15 @@
+# Halyk AI Challenge - Covenant Compliance Agent
+# Dependencies
+
+fastapi>=0.115.0
+uvicorn>=0.30.0
+websockets>=12.0
+google-genai>=1.0.0
+langchain-google-genai>=2.0.0
+langgraph>=0.2.0
+langchain-core>=0.3.0
+pandas>=2.2.0
+PyMuPDF>=1.24.0
+Pillow>=10.0.0
+python-multipart>=0.0.9
+pydantic>=2.0.0

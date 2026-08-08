@@ -1,0 +1,217 @@
+{
+  "team": "wit.kz",
+  "contact_email": "info@wit.kz",
+  "model": "muse-spark-1.2-contributor",
+  "answers": {
+    "P1": {
+      "6.1": {
+        "status": "BREACH",
+        "actual": 0.46,
+        "evidence_txn_id": "TXN-P1-0010",
+        "reasoning": "📊 Ковенант 6.1 — Максимальный коэффициент капиталоёмкости (лимит 0.42x)\n\n• Формула по договору: Капитальные затраты / (Операционные расходы + Арендные платежи) за период 2025-01-01 — 2025-12-31\n• Числитель (CapEx): найдена 1 транзакция с буквальным соответствием — TXN-P1-0010 «Purchase of quayside crane equipment» на сумму $1,842,006.44\n• Знаменатель: \n  - Операционные расходы — TXN-P1-0042 «Berth servicing and operating costs 2025» $3,104,882.61\n  - Арендные платежи — TXN-P1-0014 «Terminal land lease payments 2025» $918,443.27\n  - Итого знаменатель: $4,023,325.88\n• Расчёт: 1,842,006.44 / 4,023,325.88 = 0.46\n• Вердикт: 0.46 > 0.42 — превышение лимита, нарушение ковенанта (BREACH)\n• Улика: TXN-P1-0010 — без этой капитальной закупки коэффициент был бы 0.00 (COMPLIANT), именно она переводит показатель через порог",
+        "graph_mermaid": "graph TD\nA[\"Капитальные затраты<br/>TXN-P1-0010: $1,842,006.44\"] --> C[\"Числитель: $1,842,006.44\"]\nB1[\"Операционные расходы<br/>TXN-P1-0042: $3,104,882.61\"] --> D[\"Знаменатель\"]\nB2[\"Арендные платежи<br/>TXN-P1-0014: $918,443.27\"] --> D\nD[\"Знаменатель: $4,023,325.88\"] --> E[\"Коэффициент: 0.46\"]\nC --> E\nE --> F[\"Лимит 0.42x<br/>BREACH\"]\nF --> G[\"Улика: TXN-P1-0010\"]"
+      },
+      "6.2": {
+        "status": "BREACH",
+        "actual": 6842117.53,
+        "evidence_txn_id": "TXN-P1-0045",
+        "reasoning": "📉 Ковенант 6.2 — Минимальная выручка по категории (лимит $7,100,000.00)\n\n• Формула по договору: совокупный объём поступлений по статье «Выручка» в аудированной отчётности с учётом переквалификаций аудитора за период 2025-01-01 — 2025-12-31\n• Выручка в леджере: единственная транзакция с буквальным соответствием статье «Выручка» — TXN-P1-0030 «Port handling and stevedoring sales settlement 2025» на сумму $6,842,117.53\n• Корректировка аудитора (Примечание 7.1): TXN-P1-0045 (счёт-фактура от 2025-08-12 на $612,884.19) относится к услугам, оказанным в период 2026-01-15 — 2026-03-20, и исключается из выручки 2025 года. Без этой корректировки выручка составила бы $7,455,001.72 (COMPLIANT), с корректировкой — $6,842,117.53\n• Вердикт: $6,842,117.53 < $7,100,000.00 — нарушение ковенанта (BREACH)\n• Улика: TXN-P1-0045 — именно её исключение аудитором переводит показатель через порог",
+        "graph_mermaid": "graph TD\nA[\"Выручка по леджеру<br/>TXN-P1-0030: $6,842,117.53\"] --> C[\"Итого выручка 2025: $6,842,117.53\"]\nB[\"Корректировка аудитора<br/>TXN-P1-0045: $612,884.19<br/>исключена - услуги в 2026\"] --> C\nC --> D[\"Лимит: $7,100,000.00\"]\nD --> E[\"BREACH<br/>6,842,117.53 меньше 7,100,000\"]\nE --> F[\"Улика: TXN-P1-0045\"]"
+      },
+      "6.3": {
+        "status": "COMPLIANT",
+        "actual": 283664.18,
+        "evidence_txn_id": "null",
+        "reasoning": "✅ Ковенант 6.3 — Максимальные платежи связанным сторонам (лимит $450,000.00)\n\n• Формула по договору: совокупный объём платежей в пользу связанных сторон за период 2025-01-01 — 2025-12-31\n• Связанные стороны по KYC-досье (порог ≥20.0% голосующих прав):\n  - Aktau Holdings LLP — 34.5% → ✅ связанная сторона\n  - Kaspi Marine Engineering LLP — 18.7% → ❌ ниже порога, не связанная\n  - Ural Crane Works LLP — 6.2% → ❌ ниже порога, не связанная\n• Платежи в леджере:\n  - TXN-P1-0031 Aktau Holdings L.L.P. «Management advisory retainer» — $283,664.18 → учитывается\n  - TXN-P1-0045 Kaspi Marine — $612,884.19 → не учитывается (не связанная)\n  - TXN-P1-0010 Ural Crane Works — $1,842,006.44 → не учитывается (не связанная)\n• Итого платежи связанным сторонам: $283,664.18\n• Вердикт: $283,664.18 < $450,000.00 — лимит соблюдён (COMPLIANT)\n• Улика: отсутствует — нарушение отсутствует, нет одной спорной транзакции, меняющей вердикт",
+        "graph_mermaid": "graph TD\nA[\"KYC порог ≥20%\"] --> B[\"Aktau Holdings LLP 34.5%<br/>✅ связанная\"]\nA --> C[\"Kaspi Marine 18.7%<br/>❌ не связанная\"]\nA --> D[\"Ural Crane Works 6.2%<br/>❌ не связанная\"]\nB --> E[\"TXN-P1-0031: $283,664.18\"]\nC --> F[\"TXN-P1-0045: $612,884.19<br/>исключена\"]\nD --> G[\"TXN-P1-0010: $1,842,006.44<br/>исключена\"]\nE --> H[\"Итого: $283,664.18\"]\nH --> I[\"Лимит $450,000.00<br/>COMPLIANT\"]"
+      }
+    },
+    "P2": {
+      "6.1": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.3": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      }
+    },
+    "P3": {
+      "6.1": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.3": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      }
+    },
+    "P4": {
+      "6.1": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.3": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      }
+    },
+    "P5": {
+      "6.1": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.3": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      }
+    },
+    "P6": {
+      "6.1": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.3": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      }
+    },
+    "P7": {
+      "6.1": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.3": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      }
+    },
+    "P8": {
+      "6.1": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.3": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      }
+    },
+    "P9": {
+      "6.1": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.3": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      }
+    },
+    "P10": {
+      "6.1": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.3": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      }
+    },
+    "B1": {
+      "6.1": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.3": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      }
+    },
+    "B4": {
+      "6.1": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.2": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      },
+      "6.3": {
+        "status": null,
+        "actual": null,
+        "evidence_txn_id": null
+      }
+    }
+  }
+}
