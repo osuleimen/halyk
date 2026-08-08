@@ -12,6 +12,11 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - ADMIN_TOKEN=${ADMIN_TOKEN:-}
+      - MUSE_SPARK_API_KEY=${MUSE_SPARK_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://halyk-redis:6379/1}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://halyk-redis:6379/2}
     networks:
@@ -51,6 +56,11 @@ services:
       - halyk_cache:/app/cache
     environment:
       - PYTHONUNBUFFERED=1
+      - MUSE_SPARK_API_KEY=${MUSE_SPARK_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://halyk-redis:6379/1}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://halyk-redis:6379/2}
       - HALYK_DOMAIN=${HALYK_DOMAIN:-halyk.wit.kz}
@@ -73,6 +83,11 @@ services:
       # - /etc/letsencrypt:/etc/letsencrypt:ro
     environment:
       - PYTHONUNBUFFERED=1
+      - MUSE_SPARK_API_KEY=${MUSE_SPARK_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://halyk-redis:6379/1}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://halyk-redis:6379/2}
       - HALYK_DOMAIN=${HALYK_DOMAIN:-halyk.wit.kz}

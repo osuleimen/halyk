@@ -82,8 +82,28 @@ DEFAULT_PROVIDERS = {
 }
 
 
+def _apply_env_overrides(providers: dict) -> dict:
+    """ENV имеет приоритет над cache/providers.json — .env живёт в гитигноре."""
+    env_map = {
+        "muse_spark": "MUSE_SPARK_API_KEY",
+        "gemini": "GEMINI_API_KEY",
+        "deepseek": "DEEPSEEK_API_KEY",
+        "openai": "OPENAI_API_KEY",
+        "groq": "GROQ_API_KEY",
+    }
+    for pid, env_key in env_map.items():
+        if pid in providers:
+            env_val = os.getenv(env_key, "").strip()
+            # также поддерживаем старые имена без префикса
+            if not env_val and pid == "muse_spark":
+                env_val = os.getenv("MUSE_SPARK_API_KEY", "").strip() or os.getenv("LLM_API_KEY", "").strip()
+            if env_val:
+                providers[pid]["api_key"] = env_val
+                providers[pid]["enabled"] = True
+    return providers
+
 def load_providers() -> dict:
-    """Load provider configs from cache or defaults."""
+    """Load provider configs from cache or defaults. ENV (.env) имеет приоритет."""
     if os.path.exists(PROVIDERS_PATH):
         with open(PROVIDERS_PATH, "r", encoding="utf-8") as f:
             saved = json.load(f)
@@ -103,20 +123,23 @@ def load_providers() -> dict:
                 m["fast"] = DEFAULT_PROVIDERS["gemini"]["models"]["fast"]
             if "2.5" in m.get("pro","") or "2.0" in m.get("pro","") or "1.5" in m.get("pro",""):
                 m["pro"] = DEFAULT_PROVIDERS["gemini"]["models"]["pro"]
-            # сохраняем миграцию
-            try:
-                save_providers(saved)
-            except Exception:
-                pass
+        # ENV перекрывает cache — ключи живут в .env (гитигнор)
+        saved = _apply_env_overrides(saved)
+        # сохраняем миграцию
+        try:
+            save_providers(saved)
+        except Exception:
+            pass
         return saved
 
-    # First run — try loading Gemini key from api.txt
+    # First run — try loading Gemini key from api.txt + ENV
     providers = dict(DEFAULT_PROVIDERS)
+    providers = _apply_env_overrides(providers)
     api_txt = os.path.join(BASE_DIR, "api.txt")
     if os.path.exists(api_txt):
         with open(api_txt, "r") as f:
             key = f.read().strip()
-        if key:
+        if key and not providers["gemini"]["api_key"]:
             providers["gemini"]["api_key"] = key
             providers["gemini"]["enabled"] = True
 
