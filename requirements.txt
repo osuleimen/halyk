@@ -19,3 +19,5 @@ openai>=1.50.0
 celery[redis]>=5.4.0
 redis>=5.0.0
 flower>=2.0.0
+slowapi>=0.1.9
+limits>=3.6.0

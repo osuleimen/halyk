@@ -38,11 +38,11 @@ DEFAULT_PROVIDERS = {
     },
     "gemini": {
         "name": "Google Gemini",
-        "type": "gemini",              # Vision fallback only — чат fallback если muse_spark без ключа
+        "type": "gemini",              # Vision only — Lite основная, Flash fallback если Lite не справилась
         "api_key": "",
         "models": {
-            "fast": "gemini-1.5-flash",
-            "pro": "gemini-1.5-flash",
+            "fast": "gemini-3.5-flash-lite",
+            "pro": "gemini-3.5-flash",
         },
         "enabled": False,
     },
@@ -91,16 +91,17 @@ def load_providers() -> dict:
         for k, v in DEFAULT_PROVIDERS.items():
             if k not in saved:
                 saved[k] = v
-        # Миграция устаревших моделей Gemini 2.5/2.0 → 1.5-flash (404 для новых юзеров, Interactions API)
+        # Миграция на Gemini 3.5 Flash-Lite (основная) + 3.5 Flash fallback
         if "gemini" in saved and "models" in saved["gemini"]:
             m = saved["gemini"]["models"]
-            if m.get("fast") in ("gemini-2.5-flash", "gemini-2.0-flash"):
-                m["fast"] = "gemini-1.5-flash"
-            if m.get("pro") in ("gemini-2.5-pro", "gemini-1.5-pro", "gemini-2.0-flash"):
-                m["pro"] = "gemini-1.5-flash"
-            if "2.5" in m.get("fast","") or "2.0" in m.get("fast",""):
+            # всё старое (1.5, 2.0, 2.5) → 3.5
+            if m.get("fast") in ("gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash-001"):
+                m["fast"] = "gemini-3.5-flash-lite"
+            if m.get("pro") in ("gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-pro-latest", "gemini-1.5-flash", "gemini-1.5-flash-latest"):
+                m["pro"] = "gemini-3.5-flash"
+            if "2.5" in m.get("fast","") or "2.0" in m.get("fast","") or "1.5" in m.get("fast",""):
                 m["fast"] = DEFAULT_PROVIDERS["gemini"]["models"]["fast"]
-            if "2.5" in m.get("pro","") or "2.0" in m.get("pro",""):
+            if "2.5" in m.get("pro","") or "2.0" in m.get("pro","") or "1.5" in m.get("pro",""):
                 m["pro"] = DEFAULT_PROVIDERS["gemini"]["models"]["pro"]
             # сохраняем миграцию
             try:
@@ -130,18 +131,15 @@ def save_providers(providers: dict):
 
 
 def get_active_provider() -> tuple[str, dict]:
-    """Get the first enabled provider with a key. Muse Spark приоритет — чат не должен уходить в Gemini."""
+    """Get the first enabled provider with a key. Muse Spark приоритет — чат строго через него."""
     providers = load_providers()
-    # Приоритет: muse_spark > остальные (gemini только для Vision, не для чата)
-    if "muse_spark" in providers and providers["muse_spark"].get("enabled") and providers["muse_spark"].get("api_key"):
-        return "muse_spark", providers["muse_spark"]
-    for pid, cfg in providers.items():
-        if cfg.get("enabled") and cfg.get("api_key"):
-            # пропускаем gemini для чата если есть muse_spark без ключа — gemini остаётся fallback
-            if pid == "gemini" and "muse_spark" in providers and providers["muse_spark"].get("enabled"):
-                continue
-            return pid, cfg
-    # если muse_spark без ключа но enabled — всё равно пробуем (fallback на gemini)
+    # Чат и агент — строго muse_spark если он enabled
+    if "muse_spark" in providers and providers["muse_spark"].get("enabled"):
+        cfg = providers["muse_spark"]
+        if cfg.get("api_key"):
+            return "muse_spark", cfg
+        # muse_spark enabled но без ключа → честная ошибка, не fallback на gemini для чата
+        raise ValueError("Muse Spark enabled but API key is empty. Add Muse Spark key in Providers (Gemini — только Vision).")
     for pid, cfg in providers.items():
         if cfg.get("enabled") and cfg.get("api_key"):
             return pid, cfg

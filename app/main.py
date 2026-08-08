@@ -11,10 +11,13 @@ import threading
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Request, HTTPException
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -25,6 +28,23 @@ from app.services.llm_factory import test_provider
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+# ── Security: rate limit + optional admin token (не ломает демо, но режет ботов) ──
+def _get_client_ip(request: Request) -> str:
+    # за Caddy/X-Forwarded-For — берём реальный IP, иначе все боты с одного IP Caddy
+    xff = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
+    if xff:
+        return xff.split(",")[0].strip()
+    return get_remote_address(request)
+
+limiter = Limiter(key_func=_get_client_ip, default_limits=["60/minute"])
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "").strip()
+
+def _require_admin(request: Request):
+    if ADMIN_TOKEN:
+        tok = request.headers.get("X-Admin-Token") or request.headers.get("x-admin-token") or request.query_params.get("token")
+        if tok != ADMIN_TOKEN:
+            raise HTTPException(status_code=403, detail="Admin token required (X-Admin-Token). Установи ADMIN_TOKEN в .env и передай заголовок.")
 
 # ── Agent state ──
 agent_status = {
@@ -105,6 +125,11 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="Halyk AI Challenge — Covenant Agent", lifespan=lifespan)
+app.state.limiter = limiter
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return PlainTextResponse(f"429 Too Many Requests: {exc.detail}", status_code=429)
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.isdir(static_dir):
@@ -154,7 +179,9 @@ async def api_get_providers():
 
 
 @app.post("/api/providers")
-async def api_update_provider(req: ProviderUpdate):
+@limiter.limit("20/minute")
+async def api_update_provider(req: ProviderUpdate, request: Request):
+    _require_admin(request)
     providers = load_providers()
     if req.provider_id not in providers:
         return JSONResponse({"error": f"Unknown provider: {req.provider_id}"}, status_code=404)
@@ -169,7 +196,8 @@ async def api_update_provider(req: ProviderUpdate):
 
 
 @app.post("/api/providers/test")
-async def api_test_provider(req: ProviderUpdate):
+@limiter.limit("10/minute")
+async def api_test_provider(req: ProviderUpdate, request: Request):
     providers = load_providers()
     if req.provider_id not in providers:
         return JSONResponse({"error": f"Unknown provider"}, status_code=404)
@@ -185,7 +213,9 @@ async def api_test_provider(req: ProviderUpdate):
 # ═══ Agent API ═══
 
 @app.post("/api/run")
-async def api_run(req: RunRequest):
+@limiter.limit("3/minute")
+async def api_run(req: RunRequest, request: Request):
+    _require_admin(request)
     global agent_status, agent_answers
 
     if agent_status["state"] == "running":
@@ -426,8 +456,10 @@ async def api_documents():
 
 
 @app.post("/api/clear-cache")
-async def api_clear_cache():
+@limiter.limit("5/minute")
+async def api_clear_cache(request: Request):
     """Clear extraction and classification caches."""
+    _require_admin(request)
     from app.services.document_store import EXTRACT_CACHE_PATH, INDEX_CACHE_PATH
     for p in [EXTRACT_CACHE_PATH, INDEX_CACHE_PATH]:
         if os.path.exists(p):
@@ -436,7 +468,9 @@ async def api_clear_cache():
 
 
 @app.post("/api/upload")
-async def api_upload(file: UploadFile = File(...)):
+@limiter.limit("5/minute")
+async def api_upload(request: Request, file: UploadFile = File(...)):
+    _require_admin(request)
     """Upload a new dataset zip file, extract it, and clear caches."""
     import zipfile
     import shutil
@@ -473,7 +507,8 @@ class ChatRequest(BaseModel):
     message: str
 
 @app.post("/api/chat")
-async def api_chat(req: ChatRequest):
+@limiter.limit("10/minute")
+async def api_chat(req: ChatRequest, request: Request):
     providers = load_providers()
     # Чат — строго через Muse Spark, Gemini только Vision fallback (не чат)
     from config import get_active_provider as _gap
@@ -529,7 +564,8 @@ class GlobalChatRequest(BaseModel):
     message: str
 
 @app.post("/api/global_chat")
-async def api_global_chat(req: GlobalChatRequest):
+@limiter.limit("10/minute")
+async def api_global_chat(req: GlobalChatRequest, request: Request):
     providers = load_providers()
     from config import get_active_provider as _gap2
     try:

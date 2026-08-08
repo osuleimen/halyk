@@ -50,14 +50,27 @@ def create_llm(
 
     if ptype == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
-        llm = ChatGoogleGenerativeAI(
-            model=model_name,
-            google_api_key=api_key,
-            temperature=temperature,
-            max_output_tokens=max_tokens,
-        )
-        logger.info("Created Gemini LLM: %s", model_name)
-        return llm
+        # Gemini Vision — Lite основная, Flash fallback (по просьбе: только 3.5)
+        candidates = [model_name, "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-1.5-flash-latest", "gemini-pro"]
+        last_err = None
+        for cand in candidates:
+            try:
+                llm = ChatGoogleGenerativeAI(
+                    model=cand,
+                    google_api_key=api_key,
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                )
+                # быстрый тест что модель резолвится (не вызываем, только создаём)
+                logger.info("Created Gemini LLM: %s (requested %s)", cand, model_name)
+                return llm
+            except Exception as e:
+                last_err = e
+                if "404" in str(e) or "NOT_FOUND" in str(e):
+                    logger.warning("Gemini model %s not found, trying fallback", cand)
+                    continue
+                raise
+        raise last_err if last_err else ValueError(f"Gemini model {model_name} not found")
 
     elif ptype == "openai_compat":
         from langchain_openai import ChatOpenAI

@@ -113,32 +113,49 @@ def _extract_gemini_vision(filepath: str, max_retries: int = 3) -> str:
         return ""
 
     from google.genai import types
-    model = pcfg["models"]["fast"]
+    # Vision: Lite основная, Flash fallback (только 3.5 по просьбе)
+    candidates = [pcfg["models"]["fast"], "gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-1.5-flash-latest", "gemini-pro"]
+    # deduplicate
+    seen=set()
+    models=[]
+    for c in candidates:
+        if c not in seen:
+            seen.add(c)
+            models.append(c)
 
     for attempt in range(max_retries):
-        try:
-            with open(filepath, "rb") as f:
-                data = f.read()
-            response = vision_client.models.generate_content(
-                model=model,
-                contents=[
-                    types.Part.from_bytes(data=data, mime_type="application/pdf"),
-                    GEMINI_EXTRACT_PROMPT,
-                ],
-                config=types.GenerateContentConfig(
-                    temperature=0.0,
-                    max_output_tokens=65536,
-                ),
-            )
-            return response.text.strip()
-        except Exception as e:
-            logger.warning("Vision extraction attempt %d failed for %s: %s", attempt + 1, filepath, e)
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                wait = min(60, 2 ** (attempt + 2))
-                logger.info("Rate limited, waiting %ds...", wait)
-                time.sleep(wait)
-            elif attempt < max_retries - 1:
-                time.sleep(2 ** (attempt + 1))
+        for model in models:
+            try:
+                with open(filepath, "rb") as f:
+                    data = f.read()
+                response = vision_client.models.generate_content(
+                    model=model,
+                    contents=[
+                        types.Part.from_bytes(data=data, mime_type="application/pdf"),
+                        GEMINI_EXTRACT_PROMPT,
+                    ],
+                    config=types.GenerateContentConfig(
+                        temperature=0.0,
+                        max_output_tokens=65536,
+                    ),
+                )
+                return response.text.strip()
+            except Exception as e:
+                err = str(e)
+                if "404" in err or "NOT_FOUND" in err:
+                    logger.warning("Vision model %s not found for %s, trying next", model, os.path.basename(filepath))
+                    continue  # сразу пробуем следующий кандидат без ожидания
+                logger.warning("Vision extraction attempt %d model %s failed for %s: %s", attempt + 1, model, os.path.basename(filepath), e)
+                if "429" in err or "RESOURCE_EXHAUSTED" in err:
+                    wait = min(60, 2 ** (attempt + 2))
+                    logger.info("Rate limited, waiting %ds...", wait)
+                    time.sleep(wait)
+                    break  # на 429 — ждём и пробуем снова с первой модели
+                # для других ошибок — пробуем следующую модель
+                continue
+        # если все модели в этой попытке отпали — пауза перед следующей попыткой
+        if attempt < max_retries - 1:
+            time.sleep(2 ** (attempt + 1))
     return ""
 
 
