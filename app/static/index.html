@@ -320,6 +320,7 @@
                 <table class="metrics-table">
                     <thead><tr>
                         <th>Время запуска</th>
+                        <th>Инициатор</th>
                         <th>Модель</th>
                         <th>Кол-во сценариев</th>
                         <th>Время (сек)</th>
@@ -408,6 +409,30 @@
         </div>
     </div>
 
+    <!-- Chat Modal -->
+    <div class="modal-overlay" id="chatModal">
+        <div class="modal" style="max-width: 600px;">
+            <h2>💬 Halyk AI: Обсуждение Ковенанта</h2>
+            <div style="margin-bottom: 12px; font-size: 12px; color: var(--text-dim);">
+                Сценарий: <strong id="chatScenarioId" style="color:var(--text)"></strong> | 
+                Ковенант: <strong id="chatCovenantId" style="color:var(--text)"></strong>
+            </div>
+            
+            <div id="chatHistory" style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; height: 300px; overflow-y: auto; margin-bottom: 16px; font-size: 13px; display: flex; flex-direction: column; gap: 12px; line-height: 1.5;">
+                <div style="color: var(--text-dim); text-align: center; margin-top: 100px;">Задайте вопрос по этому сценарию. Я помогу разобраться в расчетах!</div>
+            </div>
+            
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="chatInput" placeholder="Введите ваш вопрос..." style="margin: 0; flex: 1; padding: 10px;" onkeypress="if(event.key === 'Enter') sendChatMessage()" />
+                <button class="btn-primary" onclick="sendChatMessage()" id="btnSendChat">Отправить</button>
+            </div>
+            
+            <div class="modal-buttons" style="margin-top: 16px;">
+                <button class="btn-secondary" onclick="document.getElementById('chatModal').style.display='none'">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const SCENARIOS = ['P1','P2','P3','P4','P5','P6','P7','P8','P9','P10','B1','B4'];
         let ws = null;
@@ -454,17 +479,20 @@
             const tbody = document.getElementById('metricsBody');
             let html = '';
             
-            [...data.history].reverse().forEach(run => {
-                const date = new Date(run.timestamp).toLocaleString('ru-RU');
-                html += `<tr>
-                    <td>${date}</td>
-                    <td><strong style="color:var(--accent)">${run.model}</strong></td>
-                    <td>${run.scenarios.join(', ')}</td>
-                    <td>${run.duration_sec.toFixed(1)} с</td>
-                    <td><strong style="color:var(--blue)">${run.accuracy}</strong> (${run.correct}/${run.total})</td>
-                </tr>`;
-            });
-            if (!html) html = `<tr><td colspan="5" style="text-align:center">Нет истории запусков</td></tr>`;
+            if (data.history && Array.isArray(data.history)) {
+                [...data.history].reverse().forEach(run => {
+                    const date = new Date(run.timestamp).toLocaleString('ru-RU');
+                    html += `<tr>
+                        <td>${date}</td>
+                        <td>${run.initiator || 'Система'}</td>
+                        <td><strong style="color:var(--accent)">${run.model}</strong></td>
+                        <td>${run.scenarios.join(', ')}</td>
+                        <td>${run.duration_sec.toFixed(1)} с</td>
+                        <td><strong style="color:var(--blue)">${run.accuracy || '0%'}</strong> (${run.correct || 0}/${run.total || 0})</td>
+                    </tr>`;
+                });
+            }
+            if (!html) html = `<tr><td colspan="6" style="text-align:center">Нет истории запусков</td></tr>`;
             tbody.innerHTML = html;
         }
 
@@ -684,6 +712,70 @@
             showToast('Ответ отправлен агенту!');
         }
 
+        // ── Chat Modal Logic ──
+        let currentChatSid = null;
+        let currentChatCid = null;
+
+        function openChatModal(sid, cid) {
+            currentChatSid = sid;
+            currentChatCid = cid;
+            document.getElementById('chatScenarioId').textContent = sid;
+            document.getElementById('chatCovenantId').textContent = cid;
+            document.getElementById('chatHistory').innerHTML = '<div style="color: var(--text-dim); text-align: center; margin-top: 100px;">Задайте вопрос по этому сценарию. Я помогу разобраться в расчетах!</div>';
+            document.getElementById('chatInput').value = '';
+            document.getElementById('chatModal').style.display = 'flex';
+            setTimeout(() => document.getElementById('chatInput').focus(), 100);
+        }
+
+        async function sendChatMessage() {
+            const inputEl = document.getElementById('chatInput');
+            const btnEl = document.getElementById('btnSendChat');
+            const historyEl = document.getElementById('chatHistory');
+            const message = inputEl.value.trim();
+            
+            if (!message) return;
+            
+            if (historyEl.innerHTML.includes('Задайте вопрос')) {
+                historyEl.innerHTML = '';
+            }
+            
+            historyEl.innerHTML += `<div style="align-self: flex-end; background: var(--surface2); padding: 8px 12px; border-radius: 12px 12px 0 12px; max-width: 85%; color: var(--text);"><b>Вы:</b><br>${escapeHtml(message)}</div>`;
+            inputEl.value = '';
+            historyEl.scrollTop = historyEl.scrollHeight;
+            
+            inputEl.disabled = true;
+            btnEl.disabled = true;
+            btnEl.innerHTML = '<span class="loading-spinner"></span>';
+            
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        scenario_id: currentChatSid,
+                        covenant_id: currentChatCid,
+                        message: message
+                    })
+                });
+                const data = await res.json();
+                
+                if (data.error) {
+                    historyEl.innerHTML += `<div style="align-self: flex-start; background: var(--breach-dim); padding: 8px 12px; border-radius: 12px 12px 12px 0; max-width: 85%; color: var(--breach);"><b>Ошибка:</b><br>${escapeHtml(data.error)}</div>`;
+                } else {
+                    let formattedReply = data.reply.replace(/\n/g, '<br>');
+                    historyEl.innerHTML += `<div style="align-self: flex-start; background: var(--accent-dim); padding: 8px 12px; border-radius: 12px 12px 12px 0; max-width: 85%; color: var(--text); border: 1px solid var(--accent);"><b>🤖 Агент:</b><br>${formattedReply}</div>`;
+                }
+            } catch (e) {
+                historyEl.innerHTML += `<div style="align-self: flex-start; background: var(--breach-dim); padding: 8px 12px; border-radius: 12px 12px 12px 0; max-width: 85%; color: var(--breach);"><b>Ошибка сети:</b><br>${e.message}</div>`;
+            } finally {
+                inputEl.disabled = false;
+                btnEl.disabled = false;
+                btnEl.innerHTML = 'Отправить';
+                historyEl.scrollTop = historyEl.scrollHeight;
+                setTimeout(() => inputEl.focus(), 100);
+            }
+        }
+
         // ── Answer Editing ──
         async function openEditModal(sid, cid) {
             const r = await fetch('/api/answers');
@@ -830,7 +922,12 @@
                 if (!answers[sid]) continue;
                 
                 let hasData = false;
-                let rowHtml = `<tr><td><strong style="color:var(--accent); font-size:14px;">${sid}</strong></td>`;
+                let detailsId = `details-${sid}`;
+                let rowHtml = `<tr style="cursor: pointer;" onclick="const d = document.getElementById('${detailsId}'); if(d) d.style.display = d.style.display === 'none' ? 'table-row' : 'none'">
+                    <td>
+                        <button class="btn-secondary btn-small" style="margin-right: 6px; padding: 2px 6px; font-size: 10px;">▼</button>
+                        <strong style="color:var(--accent); font-size:14px;">${sid}</strong>
+                    </td>`;
                 let comments = [];
                 
                 for (const cid of ['6.1', '6.2', '6.3']) {
@@ -860,6 +957,7 @@
                             let comment = `<div style="background: var(--surface2); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(${cell.status === 'BREACH' ? '--breach' : '--compliant'}); position: relative;">`;
                             
                             comment += `<button class="btn-secondary btn-small" onclick="openEditModal('${sid}', '${cid}')" style="position: absolute; right: 12px; top: 12px;">✏️ Изменить</button>`;
+                            comment += `<button class="btn-secondary btn-small" onclick="openChatModal('${sid}', '${cid}')" style="position: absolute; right: 105px; top: 12px;">💬 Обсудить</button>`;
                             
                             comment += `<strong>Ковенант ${cid}</strong> <span class="${tag}" style="font-size: 10px; margin-left: 5px;">${cell.status}</span><br>`;
                             
@@ -888,10 +986,14 @@
                 if (hasData) {
                     html += rowHtml;
                     if (comments.length > 0) {
-                        html += `<tr><td colspan="10" style="padding: 15px 20px; font-size: 12px; background: var(--bg); border-bottom: 1px solid var(--border);">
-                            <div style="color: var(--text-dim); font-weight: 600; margin-bottom: 8px; text-transform: uppercase; font-size: 11px;">Бизнес-выводы AI Агента по сценарию ${sid}</div>
-                            ${comments.join('')}
-                        </td></tr>`;
+                        let hasBreach = comments.some(c => c.includes('tag-breach'));
+                        let displayStyle = hasBreach ? 'table-row' : 'none';
+                        html += `<tr id="${detailsId}" style="display: ${displayStyle};">
+                            <td colspan="10" style="padding: 15px 20px; font-size: 12px; background: var(--bg); border-bottom: 1px solid var(--border);">
+                                <div style="color: var(--text-dim); font-weight: 600; margin-bottom: 8px; text-transform: uppercase; font-size: 11px;">Бизнес-выводы AI Агента по сценарию ${sid}</div>
+                                ${comments.join('')}
+                            </td>
+                        </tr>`;
                     }
                 }
             }
@@ -904,6 +1006,91 @@
 
         // Initially refresh
         refreshAll().then(() => evaluate());
+
+        // --- GLOBAL CHAT WIDGET ---
+        function toggleGlobalChat() {
+            const chat = document.getElementById('globalChatModal');
+            if (chat.style.display === 'none' || !chat.style.display) {
+                chat.style.display = 'flex';
+            } else {
+                chat.style.display = 'none';
+            }
+        }
+
+        async function sendGlobalChatMessage() {
+            const input = document.getElementById('globalChatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+            
+            input.value = '';
+            
+            const history = document.getElementById('globalChatHistory');
+            history.innerHTML += `<div style="margin-bottom: 10px; text-align: right;"><span style="background: var(--primary); padding: 8px 12px; border-radius: 12px; display: inline-block; max-width: 80%;">${escapeHtml(msg)}</span></div>`;
+            history.scrollTop = history.scrollHeight;
+            
+            // Show typing indicator
+            const typingId = 'typing-' + Date.now();
+            history.innerHTML += `<div id="${typingId}" style="margin-bottom: 10px; text-align: left;"><span style="background: var(--surface2); padding: 8px 12px; border-radius: 12px; display: inline-block; color: var(--text-dim);">Halyk AI думает...</span></div>`;
+            history.scrollTop = history.scrollHeight;
+            
+            try {
+                const r = await fetch('/api/global_chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message: msg })
+                });
+                
+                document.getElementById(typingId).remove();
+                
+                if (r.ok) {
+                    const data = await r.json();
+                    let reply = escapeHtml(data.reply).replace(/\n/g, '<br>');
+                    history.innerHTML += `<div style="margin-bottom: 10px; text-align: left;"><span style="background: var(--surface2); padding: 8px 12px; border-radius: 12px; display: inline-block; max-width: 80%; color: #d0d4e0;">${reply}</span></div>`;
+                    
+                    // If the reply implies a run or state change, refresh dashboard
+                    if (data.reply.includes('Запускаю') || data.reply.includes('меняю')) {
+                        setTimeout(() => refreshAll(), 1500);
+                    }
+                } else {
+                    const err = await r.json();
+                    history.innerHTML += `<div style="margin-bottom: 10px; text-align: left;"><span style="background: var(--breach); padding: 8px 12px; border-radius: 12px; display: inline-block;">Ошибка: ${err.error}</span></div>`;
+                }
+            } catch (e) {
+                document.getElementById(typingId)?.remove();
+                history.innerHTML += `<div style="margin-bottom: 10px; text-align: left;"><span style="background: var(--breach); padding: 8px 12px; border-radius: 12px; display: inline-block;">Ошибка сети.</span></div>`;
+            }
+            history.scrollTop = history.scrollHeight;
+        }
+        
+        document.getElementById('globalChatInput')?.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') sendGlobalChatMessage();
+        });
     </script>
+
+    <!-- Floating Global Chat Button -->
+    <button onclick="toggleGlobalChat()" style="position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 30px; background: var(--primary); color: white; border: none; font-size: 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
+        🤖
+    </button>
+
+    <!-- Global Chat Window -->
+    <div id="globalChatModal" style="display: none; position: fixed; bottom: 100px; right: 30px; width: 350px; height: 500px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 1000; flex-direction: column; overflow: hidden;">
+        <div style="padding: 15px; background: var(--surface2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 16px;">Halyk AI 🤖</strong>
+            <button onclick="toggleGlobalChat()" style="background:none; border:none; color:var(--text); font-size:16px; cursor:pointer;">✖</button>
+        </div>
+        
+        <div id="globalChatHistory" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; font-size: 13px;">
+            <div style="margin-bottom: 10px; text-align: left;">
+                <span style="background: var(--surface2); padding: 8px 12px; border-radius: 12px; display: inline-block; max-width: 80%; color: #d0d4e0;">
+                    Привет! Я Halyk AI. Вы можете попросить меня запустить сценарий, сменить модель или уточнить статусы. Чем могу помочь?
+                </span>
+            </div>
+        </div>
+        
+        <div style="padding: 10px 15px; background: var(--surface2); border-top: 1px solid var(--border); display: flex; gap: 10px;">
+            <input type="text" id="globalChatInput" placeholder="Напишите команду..." style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none;">
+            <button onclick="sendGlobalChatMessage()" class="btn-primary" style="padding: 0 15px;">➤</button>
+        </div>
+    </div>
 </body>
 </html>

@@ -55,7 +55,7 @@ DEFAULT_PROVIDERS = {
             "fast": "muse-spark-1.2-contributor",
             "pro": "muse-spark-1.2-contributor",
         },
-        "enabled": False,
+        "enabled": True,
     },
     "openai": {
         "name": "OpenAI",

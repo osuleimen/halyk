@@ -151,7 +151,7 @@ def compile_submission(state: AgentState) -> dict:
     pid, pcfg = get_active_provider()
     submission["team"] = TEAM_NAME
     submission["contact_email"] = CONTACT_EMAIL
-    submission["model"] = pcfg["models"]["fast"]
+    submission["model"] = pcfg["models"]["pro"]
 
     answers = state.get("answers", {})
     for scenario_id in submission.get("answers", {}):
@@ -185,9 +185,9 @@ def build_graph(scenarios: list[str] | None = None) -> StateGraph:
 
     # Create LLM from active provider
     pid, pcfg = get_active_provider()
-    _log(f"🤖 Using provider: {pcfg['name']} ({pcfg['models']['fast']})")
+    _log(f"🤖 Using provider: {pcfg['name']} ({pcfg['models']['pro']})")
 
-    llm = create_llm(pid, pcfg, tier="fast")
+    llm = create_llm(pid, pcfg, tier="pro")
 
     # Create ReAct agent
     analyst = create_react_agent(model=llm, tools=ALL_TOOLS)

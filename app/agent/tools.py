@@ -85,25 +85,69 @@ def list_documents(
 
 
 # ═══════════════════════════════════════
-# Tool 2: read_document
+# Tool 2: search_document
 # ═══════════════════════════════════════
 
+_document_chunks_cache = {}
+_document_tfidf_cache = {}
+
+def _chunk_text(text: str, chunk_size: int = 1500, overlap: int = 300) -> list[str]:
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunks.append(text[start:end])
+        start += chunk_size - overlap
+    return chunks
+
 @tool
-def read_document(filename: str) -> str:
-    """Прочитать полный текст документа по имени файла.
-
+def search_document(filename: str, query: str) -> str:
+    """Искать релевантные куски текста в документе по ключевым словам. Используй этот инструмент вместо чтения всего файла.
+    
     Args:
-        filename: Имя файла (например '1d262694c308.pdf').
-
+        filename: Имя файла (например '1d262694c308.pdf')
+        query: Ключевые слова для поиска (например 'Расходы на оплату труда ковенант 6.2')
+        
     Returns:
-        Полный текст документа.
+        Текст 3 наиболее релевантных параграфов из документа.
     """
-    text = _extracted_texts.get(filename)
-    if text is None:
+    global _extracted_texts, _document_chunks_cache, _document_tfidf_cache
+    if filename not in _extracted_texts:
         return f"Ошибка: документ '{filename}' не найден. Используй list_documents() чтобы увидеть доступные файлы."
-    if len(text) > 30000:
-        return text[:30000] + f"\n\n... [текст обрезан, показано 30000 из {len(text)} символов]"
-    return text
+        
+    text = _extracted_texts[filename]
+    if len(text) < 3000:
+        return text
+    
+    # 1. Chunk and vectorize if not cached
+    if filename not in _document_chunks_cache:
+        chunks = _chunk_text(text)
+        _document_chunks_cache[filename] = chunks
+        
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        vectorizer = TfidfVectorizer(stop_words=None)
+        tfidf_matrix = vectorizer.fit_transform(chunks)
+        _document_tfidf_cache[filename] = (vectorizer, tfidf_matrix)
+        
+    chunks = _document_chunks_cache[filename]
+    vectorizer, tfidf_matrix = _document_tfidf_cache[filename]
+    
+    from sklearn.metrics.pairwise import cosine_similarity
+    query_vec = vectorizer.transform([query])
+    sim = cosine_similarity(query_vec, tfidf_matrix).flatten()
+    
+    top_indices = sim.argsort()[-3:][::-1]
+    
+    if sim[top_indices[0]] == 0:
+        return "⚠️ По этим ключевым словам ничего не найдено. Попробуйте другие слова. Вот начало документа:\n\n" + "\n...\n".join(chunks[:2])
+    
+    lines = [f"Найденные фрагменты по запросу '{query}' в документе {filename}:"]
+    for idx in top_indices:
+        if sim[idx] > 0:
+            lines.append(f"\n--- Фрагмент {idx + 1} (релевантность: {sim[idx]:.2f}) ---")
+            lines.append(chunks[idx].strip())
+            
+    return "\n".join(lines)
 
 
 # ═══════════════════════════════════════
@@ -410,7 +454,7 @@ def request_human_review(transaction_id: str, question: str) -> str:
 
 ALL_TOOLS = [
     list_documents,
-    read_document,
+    search_document,
     query_ledger,
     query_ledger_sql,
     find_related_parties,

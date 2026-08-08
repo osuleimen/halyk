@@ -208,8 +208,14 @@ CLASSIFY_PROMPT = """Проанализируй текст документа и
 
 def classify_document(filename: str, text: str) -> dict:
     """Classify a document using the active LLM provider."""
+    # Normalize Cyrillic homoglyphs before regex
+    cyrillic = "АВСЕНКМОРТХУаеорсх"
+    latin    = "ABCENKMOPTXYaeopcx"
+    trans = str.maketrans(cyrillic, latin)
+    norm_text = text.translate(trans)
+    
     # Quick regex pre-extraction
-    account_ids = list(set(re.findall(r"ACC-\d+", text)))
+    account_ids = list(set(re.findall(r"ACC-\d+", norm_text)))
     scenario_ids = [ACCOUNT_TO_SCENARIO[a] for a in account_ids if a in ACCOUNT_TO_SCENARIO]
 
     lower = text.lower()

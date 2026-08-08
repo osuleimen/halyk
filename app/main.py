@@ -136,6 +136,7 @@ class ProviderUpdate(BaseModel):
 
 class RunRequest(BaseModel):
     scenarios: list[str] | None = None
+    initiator: str = "Менеджер"
 
 
 @app.get("/api/providers")
@@ -199,6 +200,7 @@ async def api_run(req: RunRequest):
         "total": len(scenarios),
         "started_at": datetime.now().isoformat(),
         "error": None,
+        "initiator": req.initiator,
     }
     agent_logs.clear()
 
@@ -227,16 +229,9 @@ async def api_run(req: RunRequest):
                 from app.services.evaluator import evaluate
                 eval_result = evaluate(agent_answers)
                 
-                # count correct
-                correct = sum(
-                    1 for s in eval_result.get("scenarios", {}).values() 
-                    for c in s.get("covenants", {}).values() if c.get("is_correct")
-                )
-                total_covenants = sum(
-                    len(s.get("covenants", {})) for s in eval_result.get("scenarios", {}).values()
-                )
-                
-                providers = load_providers()
+                correct = eval_result.get("total_score", 0)
+                total_covenants = eval_result.get("max_score", 0)
+                accuracy = f"{eval_result.get('percentage', 0):.1f}%"
                 active = next((p for p in providers.values() if p.get("enabled")), {})
                 
                 run_history.append({
@@ -246,7 +241,8 @@ async def api_run(req: RunRequest):
                     "duration_sec": duration,
                     "correct": correct,
                     "total": total_covenants,
-                    "accuracy": f"{(correct/total_covenants)*100:.1f}%" if total_covenants > 0 else "0%"
+                    "accuracy": accuracy,
+                    "initiator": agent_status.get("initiator", "Система")
                 })
                 save_history()
             except Exception as e:
@@ -448,6 +444,131 @@ async def api_upload(file: UploadFile = File(...)):
     except Exception as e:
         logger.exception("Upload failed")
         return JSONResponse({"error": f"Failed to extract zip: {e}"}, status_code=400)
+
+
+class ChatRequest(BaseModel):
+    scenario_id: str
+    covenant_id: str
+    message: str
+
+@app.post("/api/chat")
+async def api_chat(req: ChatRequest):
+    providers = load_providers()
+    active_pid = next((pid for pid, p in providers.items() if p.get("enabled")), "gemini")
+    active_cfg = providers.get(active_pid)
+    
+    if not active_cfg or not active_cfg.get("api_key"):
+        return JSONResponse({"error": "Включите и настройте провайдера LLM (например, Gemini или DeepSeek)."}, status_code=400)
+    
+    try:
+        from app.services.llm_factory import create_llm
+        llm = create_llm(active_pid, active_cfg, tier="fast")
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to init LLM: {str(e)}"}, status_code=500)
+        
+    reasoning = ""
+    actual = ""
+    status = ""
+    if req.scenario_id in agent_answers and req.covenant_id in agent_answers[req.scenario_id]:
+        ans = agent_answers[req.scenario_id][req.covenant_id]
+        reasoning = ans.get("reasoning", "")
+        actual = ans.get("actual", "")
+        status = ans.get("status", "")
+        
+    prompt = f"""
+Вы - дружелюбный и профессиональный ИИ-копилот в банковской системе анализа ковенантов.
+Пользователь задает вопрос по вашему анализу конкретного ковенанта.
+
+Контекст анализа:
+- Сценарий: {req.scenario_id}
+- Ковенант: {req.covenant_id}
+- Статус: {status}
+- Рассчитанное значение: {actual}
+- Ваше исходное бизнес-обоснование:
+{reasoning}
+
+Вопрос пользователя: {req.message}
+
+Пожалуйста, ответьте на русском языке. Объясните логику просто, понятно для бизнес-менеджера, без технического жаргона.
+Если вы допустили ошибку в анализе - признайте её. Если пользователь просит пересчитать - объясните, почему были взяты именно эти цифры.
+"""
+    try:
+        from langchain_core.messages import HumanMessage
+        response = llm.invoke([HumanMessage(content=prompt)])
+        return {"reply": response.content}
+    except Exception as e:
+        return JSONResponse({"error": f"Ошибка LLM: {str(e)}"}, status_code=500)
+
+class GlobalChatRequest(BaseModel):
+    message: str
+
+@app.post("/api/global_chat")
+async def api_global_chat(req: GlobalChatRequest):
+    providers = load_providers()
+    active_pid = next((pid for pid, p in providers.items() if p.get("enabled")), "gemini")
+    active_cfg = providers.get(active_pid)
+    
+    if not active_cfg or not active_cfg.get("api_key"):
+        return JSONResponse({"error": "Включите и настройте провайдера LLM (например, Gemini или DeepSeek)."}, status_code=400)
+    
+    try:
+        from app.services.llm_factory import create_llm
+        llm = create_llm(active_pid, active_cfg, tier="fast")
+    except Exception as e:
+        return JSONResponse({"error": f"Failed to init LLM: {str(e)}"}, status_code=500)
+        
+    prompt = f"""
+Вы - Halyk AI, Главный ИИ-Копилот дашборда Halyk AI Challenge.
+Ваша задача - помогать менеджеру управлять системой анализа ковенантов.
+Доступные провайдеры LLM: {', '.join(providers.keys())}.
+Текущий провайдер: {active_pid}.
+Состояние агента: {agent_status['state']}
+
+Если пользователь просит:
+1. ЗАПУСТИТЬ анализ конкретных сценариев (или всех): вы ДОЛЖНЫ включить в свой ответ точный тег [ACTION: RUN <сценарии через запятую>] (например, [ACTION: RUN P1,P2] или [ACTION: RUN ALL]).
+2. СМЕНИТЬ провайдера LLM: включите тег [ACTION: SET_MODEL <provider_id>] (например, [ACTION: SET_MODEL deepseek]).
+
+Если вы используете тег действия, также напишите обычный текстовый ответ пользователю (например "Запускаю анализ сценария P1...").
+
+Запрос пользователя: {req.message}
+"""
+    try:
+        from langchain_core.messages import HumanMessage
+        response = llm.invoke([HumanMessage(content=prompt)])
+        content = response.content
+        
+        # Parse actions
+        import re
+        action_match = re.search(r'\[ACTION:\s*(.*?)\]', content)
+        if action_match:
+            action = action_match.group(1).strip()
+            content = content.replace(action_match.group(0), "").strip()
+            
+            if action.startswith("RUN"):
+                scenarios_str = action[3:].strip()
+                if scenarios_str == "ALL":
+                    scenarios = ['P1','P2','P3','P4','P5','P6','P7','P8','P9','P10','B1','B4']
+                else:
+                    scenarios = [s.strip() for s in scenarios_str.split(',')]
+                # Trigger run
+                if agent_status["state"] == "running":
+                    content += "\n⚠️ Агент уже запущен, дождитесь завершения!"
+                else:
+                    await api_run(RunRequest(scenarios=scenarios, initiator="Halyk AI"))
+            elif action.startswith("SET_MODEL"):
+                model_id = action[9:].strip()
+                if model_id in providers:
+                    # Disable all, enable target
+                    for p in providers:
+                        providers[p]["enabled"] = False
+                    providers[model_id]["enabled"] = True
+                    save_providers(providers)
+                else:
+                    content += f"\n⚠️ Провайдер {model_id} не найден."
+        
+        return {"reply": content}
+    except Exception as e:
+        return JSONResponse({"error": f"Ошибка LLM: {str(e)}"}, status_code=500)
 
 
 # ═══ WebSocket ═══
