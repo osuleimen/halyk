@@ -1,0 +1,105 @@
+services:
+  halyk:
+    build: .
+    container_name: halyk-covenant-agent
+    restart: unless-stopped
+    ports:
+      # публикуем только на localhost — наружу терминирует nginx на 443
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - halyk_cache:/app/cache
+    environment:
+      - PYTHONUNBUFFERED=1
+      # если на хосте уже есть Redis для Celery — укажи его URL в .env (CELERY_BROKER_URL)
+      # иначе используется внутренний halyk-redis
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://halyk-redis:6379/1}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://halyk-redis:6379/2}
+    depends_on:
+      - halyk-redis
+    networks:
+      - halyk-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/status',timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  halyk-redis:
+    image: redis:7-alpine
+    container_name: halyk-redis
+    restart: unless-stopped
+    # не публикуем наружу — только внутри Docker сети halyk-net
+    # если на хосте уже есть Redis для wit.kz — этот не мешает (изолированная сеть)
+    networks:
+      - halyk-net
+    volumes:
+      - halyk_redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  halyk-celery:
+    build: .
+    container_name: halyk-celery-worker
+    restart: unless-stopped
+    command: celery -A app.celery_app.celery_app worker --loglevel=info --concurrency=2
+    volumes:
+      - halyk_cache:/app/cache
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://halyk-redis:6379/1}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://halyk-redis:6379/2}
+      - HALYK_DOMAIN=${HALYK_DOMAIN:-halyk.wit.kz}
+    depends_on:
+      halyk-redis:
+        condition: service_healthy
+      halyk:
+        condition: service_healthy
+    networks:
+      - halyk-net
+
+  halyk-beat:
+    build: .
+    container_name: halyk-celery-beat
+    restart: unless-stopped
+    command: celery -A app.celery_app.celery_app beat --loglevel=info
+    volumes:
+      - halyk_cache:/app/cache
+      # для проверки срока сертификата монтируем letsencrypt read-only (если есть на хосте)
+      # - /etc/letsencrypt:/etc/letsencrypt:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://halyk-redis:6379/1}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND:-redis://halyk-redis:6379/2}
+      - HALYK_DOMAIN=${HALYK_DOMAIN:-halyk.wit.kz}
+    depends_on:
+      halyk-redis:
+        condition: service_healthy
+    networks:
+      - halyk-net
+
+  # Опционально: Flower — мониторинг Celery (внутренний, не публикуем наружу по умолчанию)
+  # halyk-flower:
+  #   build: .
+  #   container_name: halyk-flower
+  #   command: celery -A app.celery_app.celery_app flower --port=5555
+  #   ports:
+  #     - "127.0.0.1:5555:5555"
+  #   environment:
+  #     - CELERY_BROKER_URL=${CELERY_BROKER_URL:-redis://halyk-redis:6379/1}
+  #   depends_on:
+  #     - halyk-redis
+  #   networks:
+  #     - halyk-net
+
+networks:
+  halyk-net:
+    driver: bridge
+
+volumes:
+  halyk_cache:
+  halyk_redis_data:

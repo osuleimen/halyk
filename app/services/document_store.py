@@ -9,7 +9,12 @@ import re
 import json
 import time
 import logging
-import fitz  # PyMuPDF
+try:
+    import fitz  # PyMuPDF
+    HAS_FITZ = True
+except ImportError:
+    fitz = None
+    HAS_FITZ = False
 
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -29,24 +34,42 @@ INDEX_CACHE_PATH = os.path.join(CACHE_DIR, "document_index.json")
 # ──────────────────────────────────────────────
 
 def _extract_pymupdf(filepath: str) -> str:
-    """Fast local extraction via PyMuPDF."""
-    doc = fitz.open(filepath)
-    pages = []
-    for page in doc:
-        pages.append(page.get_text())
-    doc.close()
-    return "\n".join(pages).strip()
+    """Fast local extraction via PyMuPDF (fallback to PyPDF2 if unavailable)."""
+    if HAS_FITZ:
+        doc = fitz.open(filepath)
+        pages = []
+        for page in doc:
+            pages.append(page.get_text())
+        doc.close()
+        return "\n".join(pages).strip()
+    else:
+        try:
+            import PyPDF2
+            r = PyPDF2.PdfReader(filepath)
+            return "\n".join([(p.extract_text() or "") for p in r.pages]).strip()
+        except Exception:
+            return ""
 
 
 def _is_scanned_pdf(filepath: str) -> bool:
     """Auto-detect scanned PDFs (images, no text)."""
-    doc = fitz.open(filepath)
-    total_text = 0
-    pages_to_check = min(3, len(doc))
-    for i in range(pages_to_check):
-        total_text += len(doc[i].get_text().strip())
-    doc.close()
-    return total_text < 200
+    if HAS_FITZ:
+        doc = fitz.open(filepath)
+        total_text = 0
+        pages_to_check = min(3, len(doc))
+        for i in range(pages_to_check):
+            total_text += len(doc[i].get_text().strip())
+        doc.close()
+        return total_text < 200
+    else:
+        # PyPDF2 heuristic
+        try:
+            import PyPDF2
+            r = PyPDF2.PdfReader(filepath)
+            txt = "".join([(p.extract_text() or "") for p in r.pages[:2]])
+            return len(txt.strip()) < 200
+        except Exception:
+            return True
 
 
 def _quality_ok(text: str, filepath: str) -> bool:
@@ -76,12 +99,14 @@ GEMINI_EXTRACT_PROMPT = """Извлеки ВЕСЬ текст из этого д
 
 
 def _extract_gemini_vision(filepath: str, max_retries: int = 3) -> str:
-    """Fallback: send PDF to Gemini Vision for OCR/extraction."""
+    """Fallback: send PDF to Gemini Vision for OCR/extraction.
+    Uses dedicated Vision provider (Gemini) even when primary is Muse Spark.
+    """
     try:
-        pid, pcfg = get_active_provider()
-        vision_client = create_vision_llm(pid, pcfg)
+        from app.services.llm_factory import get_vision_client
+        vision_client, pid, pcfg = get_vision_client()
         if vision_client is None:
-            logger.warning("No vision-capable provider available")
+            logger.warning("No vision-capable provider available (add Gemini key for scans)")
             return ""
     except Exception as e:
         logger.warning("Cannot get vision provider: %s", e)
@@ -141,12 +166,50 @@ def extract_document(filepath: str) -> tuple[str, str]:
     return text, "local_fallback"  # worst case return local
 
 
+def _needs_vision_recheck(filename: str, text: str) -> bool:
+    """Heuristic: financial statements for problematic scenarios with thin/table-missing text."""
+    lower = text.lower()
+    # Very short extraction likely means scanned table
+    if len(text) < 1200 and any(k in lower for k in ["отчёт", "баланс", "выручка", "финансов"]):
+        return True
+    # Table-heavy doc but PyMuPDF lost structure (no digits or no markdown tables)
+    if any(k in lower for k in ["финансовая отчётность", "отчёт о совокупном доходе"]):
+        digits = sum(c.isdigit() for c in text)
+        if digits < 80:  # tables should have many digits
+            return True
+    # Explicit fallback for previously known hard cases (scanned statements)
+    if len(text) < 800 and "недействующая" not in lower:
+        # Check if it looks like a statement header but no body
+        if "t" in lower and text.count("\n") < 5:
+            return True
+    return False
+
+
 def extract_all(use_cache: bool = True, progress_callback=None) -> dict[str, str]:
     """Extract text from all documents. Returns {filename: text}."""
     if use_cache and os.path.exists(EXTRACT_CACHE_PATH):
         with open(EXTRACT_CACHE_PATH, "r", encoding="utf-8") as f:
             cached = json.load(f)
         logger.info("Loaded %d cached extractions", len(cached))
+        # still do vision re-check for problematic thin docs even from cache
+        thin = [fn for fn, txt in cached.items() if _needs_vision_recheck(fn, txt)]
+        if thin:
+            logger.info("Vision re-check needed for %d thin docs from cache: %s", len(thin), thin[:5])
+            from app.services.llm_factory import get_vision_client
+            vc, _, _ = get_vision_client()
+            if vc:
+                for fn in thin:
+                    path = os.path.join(DOCUMENTS_DIR, fn)
+                    if os.path.exists(path):
+                        vtxt = _extract_gemini_vision(path)
+                        if vtxt and len(vtxt) > len(cached[fn]):
+                            cached[fn] = vtxt
+                            logger.info("Vision upgraded %s: %d -> %d chars", fn, len(cached[fn]), len(vtxt))
+                            if progress_callback:
+                                progress_callback(0, 0, fn, "vision-upgrade")
+                            time.sleep(1.5)
+                with open(EXTRACT_CACHE_PATH, "w", encoding="utf-8") as f:
+                    json.dump(cached, f, ensure_ascii=False)
         return cached
 
     results = {}
@@ -160,6 +223,13 @@ def extract_all(use_cache: bool = True, progress_callback=None) -> dict[str, str
     for i, fname in enumerate(files):
         path = os.path.join(DOCUMENTS_DIR, fname)
         text, method = extract_document(path)
+        # Extra vision re-check for thin financial statements (problematic pipeline)
+        if method != "vision" and _needs_vision_recheck(fname, text):
+            logger.info("Thin financial doc %s (%d chars) → trying Vision...", fname, len(text))
+            vtxt = _extract_gemini_vision(path)
+            if vtxt and len(vtxt) > len(text) * 1.3:
+                text, method = vtxt, "vision"
+                logger.info("Vision improved %s to %d chars", fname, len(text))
         results[fname] = text
 
         if method == "vision":

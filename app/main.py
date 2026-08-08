@@ -204,6 +204,22 @@ async def api_run(req: RunRequest):
     }
     agent_logs.clear()
 
+    # --- Celery path (если на halyk.wit.kz уже есть брокер) — аккуратно, с fallback ---
+    try:
+        from app.celery_app import is_celery_available
+        if is_celery_available():
+            from app.tasks import run_covenant_agent
+            task = run_covenant_agent.delay(scenarios, req.initiator)
+            agent_status["celery_task_id"] = task.id
+            agent_status["executor"] = "celery"
+            logger.info("Dispatched Celery task %s for %s", task.id, scenarios)
+            broadcast_log(f"📨 Celery task {task.id[:8]} dispatched — воркер там уже крутится")
+            return {"status": "started", "executor": "celery", "task_id": task.id, "scenarios": scenarios}
+        else:
+            logger.info("Celery not available (no broker) — fallback to threading")
+    except Exception as e:
+        logger.warning("Celery dispatch failed, fallback to threading: %s", e)
+
     def _run():
         global agent_status, agent_answers
         try:
@@ -232,7 +248,11 @@ async def api_run(req: RunRequest):
                 correct = eval_result.get("total_score", 0)
                 total_covenants = eval_result.get("max_score", 0)
                 accuracy = f"{eval_result.get('percentage', 0):.1f}%"
-                active = next((p for p in providers.values() if p.get("enabled")), {})
+                from config import load_providers as _lp
+                _providers = _lp()
+                active = next((p for p in _providers.values() if p.get("enabled") and p.get("api_key")), {})
+                if not active:
+                    active = next((p for p in _providers.values() if p.get("enabled")), {})
                 
                 run_history.append({
                     "timestamp": end_time.isoformat(),
@@ -242,7 +262,8 @@ async def api_run(req: RunRequest):
                     "correct": correct,
                     "total": total_covenants,
                     "accuracy": accuracy,
-                    "initiator": agent_status.get("initiator", "Система")
+                    "initiator": agent_status.get("initiator", "Система"),
+                    "executor": "threading",
                 })
                 save_history()
             except Exception as e:
@@ -258,7 +279,7 @@ async def api_run(req: RunRequest):
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
-    return {"status": "started", "scenarios": scenarios}
+    return {"status": "started", "executor": "threading", "scenarios": scenarios}
 
 
 @app.get("/api/status")

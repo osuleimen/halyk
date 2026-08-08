@@ -1,1096 +1,667 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Halyk AI Challenge — Agent Dashboard</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
-        :root {
-            --bg: #0f1117;
-            --surface: #1a1d27;
-            --surface2: #232733;
-            --border: #2d3140;
-            --text: #e4e7f0;
-            --text-dim: #8b90a0;
-            --accent: #00d4aa;
-            --accent-dim: #00d4aa33;
-            --breach: #ff5c5c;
-            --breach-dim: #ff5c5c22;
-            --compliant: #00d4aa;
-            --compliant-dim: #00d4aa22;
-            --warning: #ffb740;
-            --blue: #5b8def;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-        
-        /* Modal for HITL */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);
-            display: none; justify-content: center; align-items: center; z-index: 2000;
-        }
-        .modal {
-            background: var(--surface); border: 1px solid var(--accent);
-            border-radius: 12px; padding: 24px; max-width: 500px; width: 100%;
-            box-shadow: 0 10px 40px rgba(0,212,170,0.2);
-        }
-        .modal h2 { color: var(--accent); margin-bottom: 12px; font-size: 18px; display: flex; align-items: center; gap: 8px;}
-        .modal p { color: var(--text); font-size: 14px; line-height: 1.5; margin-bottom: 20px;}
-        .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
-        
-        header {
-            background: linear-gradient(135deg, #1a1d27, #232733);
-            border-bottom: 1px solid var(--border);
-            padding: 14px 28px;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        header h1 { font-size: 17px; font-weight: 600; }
-        header h1 span { color: var(--accent); }
-        
-        .tabs {
-            display: flex; gap: 4px; background: var(--surface); padding: 4px; border-radius: 10px;
-            border: 1px solid var(--border); margin: 16px 24px;
-        }
-        .tab {
-            padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
-            cursor: pointer; transition: all 0.2s; color: var(--text-dim);
-        }
-        .tab:hover { color: var(--text); }
-        .tab.active { background: var(--accent); color: #0f1117; font-weight: 600; }
-        
-        .tab-content { display: none; padding: 0 24px 24px; }
-        .tab-content.active { display: block; }
-        
-        .container { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-        .full-width { grid-column: 1 / -1; }
-        
-        .card {
-            background: var(--surface); border: 1px solid var(--border);
-            border-radius: 12px; padding: 18px;
-        }
-        .card-title {
-            font-size: 13px; font-weight: 600; color: var(--text-dim);
-            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 14px;
-        }
-        
-        .status-badge {
-            padding: 5px 12px; border-radius: 16px; font-size: 11px;
-            font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
-        }
-        .status-idle { background: var(--surface2); color: var(--text-dim); }
-        .status-running { background: var(--accent-dim); color: var(--accent); animation: pulse 2s infinite; }
-        .status-done { background: var(--compliant-dim); color: var(--compliant); }
-        .status-error { background: var(--breach-dim); color: var(--breach); }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
-        
-        button {
-            padding: 8px 16px; border: none; border-radius: 8px;
-            font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
-            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-        }
-        .btn-primary { background: var(--accent); color: #0f1117; }
-        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px var(--accent-dim); }
-        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-        .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-        .btn-secondary:hover { background: var(--border); }
-        .btn-danger { background: var(--breach-dim); color: var(--breach); border: 1px solid #ff5c5c44; }
-        .btn-small { padding: 5px 10px; font-size: 11px; }
-        
-        .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-        
-        .progress-bar { width: 100%; height: 6px; background: var(--surface2); border-radius: 3px; margin: 10px 0; overflow: hidden; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--blue)); border-radius: 3px; transition: width 0.5s; }
-        .progress-text { font-size: 12px; color: var(--text-dim); }
-        
-        /* Provider cards */
-        .provider-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-        .provider-card {
-            background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 16px;
-            transition: border-color 0.2s;
-        }
-        .provider-card.active { border-color: var(--accent); }
-        .provider-card .p-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .provider-card .p-name { font-weight: 600; font-size: 14px; }
-        .provider-card .p-model { font-size: 11px; color: var(--text-dim); font-family: monospace; }
-        .provider-card .p-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
-        .p-status-on { background: var(--compliant-dim); color: var(--compliant); }
-        .p-status-off { background: var(--surface); color: var(--text-dim); }
-        
-        input[type="text"], input[type="password"] {
-            width: 100%; padding: 8px 10px; background: var(--bg); color: var(--text);
-            border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 12px;
-            margin: 6px 0;
-        }
-        input:focus { outline: none; border-color: var(--accent); }
-        
-        .toggle { position: relative; width: 40px; height: 22px; cursor: pointer; }
-        .toggle input { opacity: 0; width: 0; height: 0; }
-        .toggle .slider {
-            position: absolute; inset: 0; background: var(--surface2); border-radius: 11px;
-            border: 1px solid var(--border); transition: 0.3s;
-        }
-        .toggle .slider::before {
-            content: ''; position: absolute; width: 16px; height: 16px;
-            left: 2px; bottom: 2px; background: var(--text-dim); border-radius: 50%; transition: 0.3s;
-        }
-        .toggle input:checked + .slider { background: var(--accent-dim); border-color: var(--accent); }
-        .toggle input:checked + .slider::before { transform: translateX(18px); background: var(--accent); }
-        
-        /* Tables */
-        .answers-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .answers-table th {
-            text-align: left; padding: 6px 10px; border-bottom: 2px solid var(--border);
-            color: var(--text-dim); font-weight: 600; font-size: 10px; text-transform: uppercase;
-        }
-        .answers-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); font-family: monospace; font-size: 11px; }
-        .answers-table tr:hover { background: var(--surface2); }
-        
-        .metrics-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .metrics-table th { text-align: left; padding: 10px; border-bottom: 2px solid var(--border); color: var(--text-dim); }
-        .metrics-table td { padding: 10px; border-bottom: 1px solid var(--border); }
-        .metrics-table tr:hover { background: var(--surface2); }
-        
-        .tag-breach { color: var(--breach); background: var(--breach-dim); padding: 2px 6px; border-radius: 4px; font-weight: 600; }
-        .tag-compliant { color: var(--compliant); background: var(--compliant-dim); padding: 2px 6px; border-radius: 4px; font-weight: 600; }
-        .tag-empty { color: var(--text-dim); font-style: italic; }
-        
-        .log-container {
-            background: #0a0c10; border: 1px solid var(--border); border-radius: 8px;
-            padding: 10px; height: 380px; overflow-y: auto;
-            font-family: 'Consolas', monospace; font-size: 11px; line-height: 1.5;
-        }
-        .log-container div { color: var(--text-dim); white-space: pre-wrap; word-break: break-all; }
-        
-        .score-big {
-            font-size: 44px; font-weight: 700;
-            background: linear-gradient(135deg, var(--accent), var(--blue));
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            text-align: center; padding: 16px 0;
-        }
-        .score-detail { text-align: center; color: var(--text-dim); font-size: 12px; }
-        
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        .stat-item { background: var(--surface2); border-radius: 8px; padding: 14px; text-align: center; }
-        .stat-value { font-size: 22px; font-weight: 700; color: var(--accent); }
-        .stat-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; margin-top: 4px; }
-        
-        .toast {
-            position: fixed; bottom: 20px; right: 20px; padding: 12px 20px;
-            background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-            font-size: 13px; z-index: 1000; display: none; box-shadow: 0 8px 32px #00000066;
-        }
-        .toast.success { border-color: var(--compliant); }
-        .toast.error { border-color: var(--breach); }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.1/dist/mermaid.min.js"></script>
-    <script>
-        mermaid.initialize({ startOnLoad: false, theme: 'dark' });
-        
-        async function toggleMermaid(btn, id) {
-            const div = document.getElementById(id);
-            const code = document.getElementById(id + '-code').textContent;
-            
-            if (div.style.display === 'none') {
-                div.style.display = 'block';
-                btn.textContent = 'Скрыть визуализацию логики';
-                
-                if (!div.hasAttribute('data-rendered')) {
-                    try {
-                        const { svg } = await mermaid.render('svg-' + id, code);
-                        div.innerHTML = svg;
-                        div.setAttribute('data-rendered', 'true');
-                    } catch (e) {
-                        console.error('Mermaid render error:', e);
-                        div.innerHTML = '<div style="color:var(--breach);">Ошибка рендеринга графа: ' + e.message + '</div>';
-                    }
-                }
-            } else {
-                div.style.display = 'none';
-                btn.textContent = 'Показать визуализацию логики';
-            }
-        }
-    </script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Halyk AI Challenge — Covenant Agent | muse-spark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --halyk-green:#1DB954; /* fallback */
+  --halyk-dark:#0A1210;
+  --halyk-green-deep:#0B7A3B;
+  --halyk-green-bright:#20D68A;
+  --bg:#0B0F0E;
+  --surface:#151C1A;
+  --surface2:#1D2724;
+  --surface3:#22302C;
+  --border:#2A3A36;
+  --text:#E8F0EC;
+  --text-dim:#9AA8A2;
+  --text-faint:#6B7B75;
+  --accent:#1DB954;
+  --accent-dim:#1DB95422;
+  --breach:#FF5A5A;
+  --breach-dim:#FF5A5A18;
+  --compliant:#1DB954;
+  --compliant-dim:#1DB95418;
+  --warning:#F5B945;
+  --blue:#4F8BFF;
+  --radius:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+a{color:var(--accent)}
+/* Header */
+header{
+  background:linear-gradient(135deg, #0F201B 0%, #1A3328 60%, #143624 100%);
+  border-bottom:1px solid var(--border);
+  padding:16px 28px;
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  position:sticky;top:0;z-index:100;backdrop-filter:blur(10px);
+}
+.halyk-brand{display:flex;align-items:center;gap:14px}
+.halyk-logo{width:42px;height:42px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#062015;letter-spacing:-1px}
+.halyk-title h1{font-size:16px;font-weight:700;letter-spacing:-0.02em}
+.halyk-title h1 span{color:var(--accent)}
+.halyk-title p{font-size:11px;color:var(--text-dim);margin-top:2px}
+.header-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.model-badge{background:var(--accent);color:#062015;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:6px}
+.model-badge small{font-weight:600;opacity:0.8}
+.status-badge{padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase}
+.status-idle{background:var(--surface2);color:var(--text-dim);border:1px solid var(--border)}
+.status-running{background:var(--accent-dim);color:var(--accent);border:1px solid #1DB95444;animation:pulse 1.8s infinite}
+.status-done{background:var(--compliant-dim);color:var(--compliant);border:1px solid #1DB95444}
+.status-error{background:var(--breach-dim);color:var(--breach);border:1px solid #FF5A5A33}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}
+/* Tabs */
+.tabs-wrap{padding:16px 24px 0;max-width:1400px;margin:0 auto}
+.tabs{display:inline-flex;gap:4px;background:var(--surface);padding:4px;border-radius:12px;border:1px solid var(--border)}
+.tab{padding:8px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text-dim);transition:.18s;user-select:none}
+.tab:hover{color:var(--text);background:var(--surface2)}
+.tab.active{background:var(--accent);color:#062015;font-weight:700}
+.tab-content{display:none;padding:18px 24px 28px;max-width:1400px;margin:0 auto}
+.tab-content.active{display:block}
+.container{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.full-width{grid-column:1 / -1}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+.card-title{font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card-title .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.progress-bar{width:100%;height:8px;background:var(--surface2);border-radius:999px;overflow:hidden;margin:12px 0}
+.progress-fill{height:100%;background:linear-gradient(90deg, var(--accent), #2ED8A0);border-radius:999px;transition:width .6s ease}
+.progress-text{font-size:12px;color:var(--text-dim)}
+button{padding:8px 16px;border:none;border-radius:9px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn-primary{background:var(--accent);color:#062015}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px #1DB95430}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--surface3)}
+.btn-ghost{background:transparent;color:var(--text-dim);border:1px dashed var(--border)}
+.btn-danger{background:var(--breach-dim);color:var(--breach);border:1px solid #FF5A5A33}
+.btn-small{padding:6px 10px;font-size:11px;border-radius:7px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.chip{padding:4px 10px;border-radius:999px;font-size:11px;font-weight:600;background:var(--surface2);border:1px solid var(--border);color:var(--text-dim)}
+.chip.on{background:var(--accent-dim);color:var(--accent);border-color:#1DB95433}
+/* Score */
+.score-big{font-size:48px;font-weight:800;background:linear-gradient(135deg, var(--accent), #2ED8A0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;line-height:1}
+.score-detail{text-align:center;color:var(--text-dim);font-size:12px;margin-top:6px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+.stat-value{font-size:22px;font-weight:800;color:var(--text)}
+.stat-label{font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+.honest-banner{background:linear-gradient(135deg, #1DB95414, #1DB95408);border:1px solid #1DB95433;border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.honest-banner .icon{width:36px;height:36px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px}
+.honest-banner b{color:var(--accent)}
+/* Tables */
+.answers-table{width:100%;border-collapse:collapse;font-size:12px}
+.answers-table th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+.answers-table td{padding:8px 10px;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:11px}
+.answers-table tr:hover{background:var(--surface2)}
+.metrics-table{width:100%;border-collapse:collapse;font-size:12px}
+.metrics-table th{text-align:left;padding:10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-weight:700;font-size:10px;text-transform:uppercase}
+.metrics-table td{padding:10px;border-bottom:1px solid var(--border)}
+.tag-breach{color:var(--breach);background:var(--breach-dim);padding:3px 8px;border-radius:6px;font-weight:700;font-size:11px}
+.tag-compliant{color:var(--compliant);background:var(--compliant-dim);padding:3px 8px;border-radius:6px;font-weight:700;font-size:11px}
+.tag-empty{color:var(--text-faint);font-style:italic}
+.log-container{background:#080C0B;border:1px solid var(--border);border-radius:10px;padding:10px;height:380px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6}
+.log-container div{color:var(--text-dim);white-space:pre-wrap;word-break:break-word}
+/* Provider */
+.provider-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:12px}
+.provider-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;transition:.2s;position:relative}
+.provider-card.active{border-color:var(--accent);box-shadow:0 0 0 3px #1DB95418}
+.provider-card.recommended::after{content:'РЕКОМЕНДУЕТСЯ';position:absolute;top:-8px;right:12px;background:var(--accent);color:#062015;font-size:9px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:.06em}
+.p-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.p-name{font-weight:700;font-size:14px}
+.p-model{font-size:11px;color:var(--text-dim);font-family:'JetBrains Mono',monospace}
+.p-status{font-size:11px;padding:3px 9px;border-radius:999px;font-weight:700}
+.p-status-on{background:var(--compliant-dim);color:var(--compliant)}
+.p-status-off{background:var(--surface);color:var(--text-dim);border:1px solid var(--border)}
+input[type="text"],input[type="password"],textarea,select{width:100%;padding:9px 11px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;margin:6px 0}
+textarea{font-family:'Inter',sans-serif}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #1DB95418}
+.toggle{position:relative;width:42px;height:24px;cursor:pointer;display:inline-block}
+.toggle input{opacity:0;width:0;height:0}
+.toggle .slider{position:absolute;inset:0;background:var(--surface3);border-radius:999px;border:1px solid var(--border);transition:.2s}
+.toggle .slider::before{content:'';position:absolute;width:18px;height:18px;left:2px;bottom:2px;background:var(--text-dim);border-radius:50%;transition:.2s}
+.toggle input:checked + .slider{background:var(--accent-dim);border-color:var(--accent)}
+.toggle input:checked + .slider::before{transform:translateX(18px);background:var(--accent)}
+.toast{position:fixed;bottom:20px;right:20px;padding:12px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-size:13px;z-index:1200;display:none;box-shadow:0 12px 40px #00000066;max-width:420px}
+.toast.success{border-color:var(--accent)}
+.toast.error{border-color:var(--breach)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);display:none;justify-content:center;align-items:center;z-index:1100;padding:16px}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:22px;max-width:620px;width:100%;box-shadow:0 20px 60px #00000066;max-height:90vh;overflow:auto}
+.modal h2{color:var(--text);margin-bottom:10px;font-size:18px;display:flex;align-items:center;gap:8px}
+.modal p{color:var(--text-dim);font-size:13px;line-height:1.6;margin-bottom:16px}
+.modal-buttons{display:flex;gap:10px;justify-content:flex-end}
+.loading-spinner{display:inline-block;width:14px;height:14px;border:2px solid #FFFFFF55;border-radius:50%;border-top-color:#fff;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* ===== Mobile: удобно одной рукой ===== */
+@media(max-width:900px){
+  .container{grid-template-columns:1fr;gap:12px}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  header{flex-direction:column;align-items:flex-start;padding:12px 16px;gap:10px}
+  .halyk-title h1{font-size:15px}
+  .halyk-title p{font-size:10px}
+  .header-right{width:100%;justify-content:space-between}
+  .model-badge{font-size:10px;padding:5px 9px}
+  .tabs-wrap{padding:10px 12px 0;overflow:hidden}
+  .tabs{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap;max-width:100%}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{white-space:nowrap;flex:0 0 auto;padding:9px 14px;font-size:12px}
+  .tab-content{padding:12px 12px 20px}
+  .card{padding:14px;border-radius:12px}
+  .honest-banner{flex-direction:column;align-items:flex-start;gap:8px}
+  .provider-grid{grid-template-columns:1fr}
+  .log-container{height:300px}
+  .answers-table{font-size:11px}
+  .metrics-table{font-size:11px}
+}
+@media(max-width:640px){
+  header{position:sticky;top:0}
+  .halyk-logo{width:36px;height:36px;font-size:16px;border-radius:8px}
+  .halyk-brand{gap:10px}
+  .halyk-title h1{font-size:14px}
+  .controls{flex-direction:column;align-items:stretch}
+  .controls button{width:100%;min-height:44px;justify-content:center}
+  .controls div[style*="margin-left:auto"]{margin-left:0!important;width:100%}
+  .controls div[style*="margin-left:auto"] button{width:100%}
+  .score-big{font-size:36px}
+  .stat-item{padding:10px}
+  .stat-value{font-size:18px}
+  .stat-label{font-size:9px}
+  .chip{font-size:10px;padding:3px 8px}
+  button{min-height:40px}
+  .btn-small{min-height:32px}
+  .answers-table th, .answers-table td{padding:6px 7px;font-size:10px}
+  .answers-table td{word-break:break-word}
+  /* таблицы — горизонтальный скролл, первая колонка липкая */
+  .card div[style*="overflow:auto"]{margin:0 -14px;padding:0 14px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .answers-table{ min-width:680px }
+  .metrics-table{ min-width:560px }
+  .modal{margin:0 8px;max-width:none;width:calc(100% - 16px);border-radius:14px;padding:16px;max-height:92vh}
+  .modal h2{font-size:16px}
+  .modal-overlay{align-items:flex-end;padding:0}
+  .modal-overlay .modal{border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:88vh}
+  #chatHistory{height:52vh!important; max-height:52vh}
+  .toast{left:12px;right:12px;bottom:12px;max-width:none;text-align:center}
+  input[type="text"],input[type="password"],textarea,select{font-size:16px} /* iOS не зумит */
+  .toggle{width:44px;height:26px}
+  .toggle .slider::before{width:20px;height:20px}
+}
+@media(max-width:380px){
+  .tabs{padding:3px}
+  .tab{padding:8px 10px;font-size:11px}
+  .score-big{font-size:32px}
+  .halyk-title p{display:none}
+}
+@media(hover:none) and (pointer:coarse){
+  button:active{transform:scale(0.98)}
+  .tab:active{transform:scale(0.98)}
+  .answers-table tr:hover{background:transparent}
+  .answers-table tr:active{background:var(--surface2)}
+}
+/* safe area для iPhone */
+@supports(padding:max(0px)){
+  body{padding-left:max(0px, env(safe-area-inset-left)); padding-right:max(0px, env(safe-area-inset-right))}
+  .toast{padding-bottom:max(12px, env(safe-area-inset-bottom))}
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:false, theme:'dark'})</script>
 </head>
 <body>
-    <header>
-        <h1>🏦 <span>Halyk AI Challenge</span> — Covenant Agent</h1>
-        <div id="statusBadge" class="status-badge status-idle">IDLE</div>
-    </header>
-
-    <div class="tabs">
-        <div class="tab active" onclick="switchTab('agent')">⚡ Агент (Мониторинг)</div>
-        <div class="tab" onclick="switchTab('results')">📊 Результаты & Выводы</div>
-        <div class="tab" onclick="switchTab('metrics')">📈 Сравнение Моделей</div>
-        <div class="tab" onclick="switchTab('providers')">🔧 Провайдеры</div>
-        <div class="tab" onclick="switchTab('logs')">📝 Логи</div>
+<header>
+  <div class="halyk-brand">
+    <div class="halyk-logo">HB</div>
+    <div class="halyk-title">
+      <h1>Halyk Bank — <span>Covenant Agent</span></h1>
+      <p>AI-аналитика ковенантов • честные результаты • воспроизводимость</p>
     </div>
+  </div>
+  <div class="header-right">
+    <div class="model-badge" title="Основная модель + Vision fallback">⚡ muse-spark-1.2-contributor <small>основная</small></div>
+    <div class="model-badge" style="background:var(--surface2);color:var(--text);border:1px solid var(--border)" title="Vision для сканированных финотчётов">👁️ Gemini Vision <small>fallback</small></div>
+    <div id="statusBadge" class="status-badge status-idle">IDLE</div>
+  </div>
+</header>
 
-    <!-- TAB: Agent -->
-    <div class="tab-content active" id="tab-agent">
-        <div class="container">
-            <div class="card full-width">
-                <div class="card-title">⚡ Управление Анализом Ковенантов</div>
-                <div class="controls">
-                    <button class="btn-primary" id="btnRunAll" onclick="runAgent()">
-                        <span id="runAllIcon">▶</span> Запустить всех
-                    </button>
-                    <button class="btn-secondary" id="btnRunP1" onclick="runAgent(['P1'])">▶ Тест P1</button>
-                    <button class="btn-secondary" onclick="refreshAll()">🔄 Обновить состояния</button>
-                    
-                    <div style="margin-left:auto; display:flex; align-items:center; gap:8px;">
-                        <input type="file" id="datasetUpload" accept=".zip" style="display:none;" onchange="uploadDataset(this.files[0])">
-                        <button class="btn-secondary" id="btnUpload" onclick="document.getElementById('datasetUpload').click()">
-                            <span id="uploadIcon">📁</span> Загрузить новый ZIP датасет и запустить
-                        </button>
-                    </div>
-                </div>
-                <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-                <div class="progress-text" id="progressText">Система готова к запуску</div>
-            </div>
-            
-            <div class="card">
-                <div class="card-title">🏆 Оценка Точности (Scoring)</div>
-                <div class="score-big" id="scoreValue">—</div>
-                <div class="score-detail" id="scoreDetail">Ожидание завершения работы агента...</div>
-            </div>
-            <div class="card">
-                <div class="card-title">📊 Статистика Выполнения</div>
-                <div class="stats-grid" style="margin-top: 15px;">
-                    <div class="stat-item"><div class="stat-value" id="statFilled">0</div><div class="stat-label">Проверено</div></div>
-                    <div class="stat-item"><div class="stat-value" id="statBreach" style="color:var(--breach)">0</div><div class="stat-label">Нарушений</div></div>
-                    <div class="stat-item"><div class="stat-value" id="statCompliant" style="color:var(--compliant)">0</div><div class="stat-label">Соблюдено</div></div>
-                    <div class="stat-item"><div class="stat-value" id="statTotal">36</div><div class="stat-label">Всего</div></div>
-                </div>
-            </div>
+<div class="tabs-wrap">
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="agent">⚡ Агент</div>
+    <div class="tab" data-tab="results">📊 Результаты</div>
+    <div class="tab" data-tab="metrics">📈 Метрики</div>
+    <div class="tab" data-tab="providers">🔧 Провайдеры</div>
+    <div class="tab" data-tab="logs">📝 Логи</div>
+  </div>
+</div>
+
+<!-- AGENT -->
+<div class="tab-content active" id="tab-agent">
+  <div class="container">
+    <div class="card full-width">
+      <div class="honest-banner">
+        <div class="icon">✓</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700"><b>Честный режим + Расширенный пайплайн:</b> результаты считаются только локальным evaluator’ом. <b>muse-spark-1.2-contributor</b> — основная, <b>Gemini Vision</b> — fallback для сканированных таблиц.</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px">Все ответы — вывод агента через инструменты. Evidence = null означает отсутствие единственной спорной транзакции. Проблемные P3/P4/P5/P6/P9 проходят двухпроходную верификацию.</div>
         </div>
+        <span class="chip on">● muse-spark + Vision</span>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:700;color:var(--text)">Расширенный пайплайн:</span>
+        <span class="chip on">1. PyMuPDF → Gemini Vision (если <1200 симв. или нет цифр)</span>
+        <span class="chip">2. Классификация → индекс</span>
+        <span class="chip">3. ReAct агент (muse-spark)</span>
+        <span class="chip" style="background:var(--accent-dim);color:var(--accent);border-color:#1DB95444">4. Верификация P3/P4/P5/P6/P9</span>
+        <span class="chip">5. Компиляция submission.json</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--warning)">P6 ловушка: соцналог исключён ✓</span>
+      </div>
+      <div class="card-title"><span class="dot"></span> Управление анализом ковенантов</div>
+      <div class="controls">
+        <button class="btn-primary" id="btnRunAll" onclick="runAgent()"> <span id="runAllIcon">▶</span> Запустить все сценарии</button>
+        <button class="btn-secondary" id="btnRunP1" onclick="runAgent(['P1','P2','P3'])">▶ Быстрый тест (P1–P3)</button>
+        <button class="btn-secondary" onclick="refreshAll()">🔄 Обновить</button>
+        <button class="btn-ghost" onclick="evaluate()">🧪 Пересчитать оценку</button>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          <input type="file" id="datasetUpload" accept=".zip" style="display:none" onchange="uploadDataset(this.files[0])">
+          <button class="btn-secondary" id="btnUpload" onclick="document.getElementById('datasetUpload').click()"><span id="uploadIcon">📁</span> Загрузить ZIP</button>
+        </div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="progress-text" id="progressText">Система готова. Нажми «Запустить» — агент прочитает документы и заполнит 36 ячеек.</div>
     </div>
-
-    <!-- TAB: Results -->
-    <div class="tab-content" id="tab-results">
-        <div class="container">
-            <div class="card full-width">
-                <div class="card-title">📊 Выводы Агента и Бизнес-обоснования</div>
-                <p style="color:var(--text-dim); font-size:12px; margin-bottom:14px;">
-                    Подробная таблица с результатами проверок по каждому сценарию. Включает интерпретируемые комментарии от AI, которые объясняют логику решения профессиональным языком.
-                </p>
-                
-                <div style="display:flex; gap: 8px; margin-bottom: 12px;">
-                    <button class="btn-secondary" onclick="evaluate()">📊 Запросить оценку эталона (Ground Truth)</button>
-                    <a href="/api/submission" target="_blank"><button class="btn-secondary">📄 Скачать JSON</button></a>
-                    <a href="/api/download_submission" target="_blank"><button class="btn-primary" style="margin-left:auto">💾 Скачать финальный ZIP для отправки</button></a>
-                </div>
-                
-                <table class="answers-table">
-                    <thead><tr>
-                        <th>Сценарий</th>
-                        <th>6.1 Статус</th><th>Actual</th><th>Evidence</th>
-                        <th>6.2 Статус</th><th>Actual</th><th>Evidence</th>
-                        <th>6.3 Статус</th><th>Actual</th><th>Evidence</th>
-                    </tr></thead>
-                    <tbody id="answersBody"></tbody>
-                </table>
-                
-                <div id="evalResults" style="margin-top: 24px;"></div>
-            </div>
-        </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--blue)"></span> Оценка точности</div>
+      <div class="score-big" id="scoreValue">—</div>
+      <div class="score-detail" id="scoreDetail">Ожидание завершения работы агента…</div>
+      <div style="display:flex;gap:8px;margin-top:14px;justify-content:center">
+        <span class="chip">status 0.50</span><span class="chip">actual 0.30</span><span class="chip">evidence 0.20</span>
+      </div>
     </div>
-
-    <!-- TAB: Metrics -->
-    <div class="tab-content" id="tab-metrics">
-        <div class="container">
-            <div class="card full-width">
-                <div class="card-title">📈 Сравнение Скорости и Точности Моделей</div>
-                <p style="color:var(--text-dim); font-size:12px; margin-bottom:14px;">
-                    История запусков и замеры скорости работы моделей (Groq/Qwen vs DeepSeek vs Gemini).
-                </p>
-                <table class="metrics-table">
-                    <thead><tr>
-                        <th>Время запуска</th>
-                        <th>Инициатор</th>
-                        <th>Модель</th>
-                        <th>Кол-во сценариев</th>
-                        <th>Время (сек)</th>
-                        <th>Точность</th>
-                    </tr></thead>
-                    <tbody id="metricsBody"></tbody>
-                </table>
-            </div>
-        </div>
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--warning)"></span> Статистика выполнения</div>
+      <div class="stats-grid" style="margin-top:6px">
+        <div class="stat-item"><div class="stat-value" id="statFilled">0</div><div class="stat-label">Проверено ячеек</div></div>
+        <div class="stat-item"><div class="stat-value" id="statBreach" style="color:var(--breach)">0</div><div class="stat-label">Нарушений</div></div>
+        <div class="stat-item"><div class="stat-value" id="statCompliant" style="color:var(--compliant)">0</div><div class="stat-label">Соблюдено</div></div>
+        <div class="stat-item"><div class="stat-value" id="statTotal">36</div><div class="stat-label">Всего ячеек</div></div>
+      </div>
+      <div style="margin-top:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;gap:8px;align-items:center">
+        <span style="font-size:11px;color:var(--text-dim)">Активный провайдер:</span><span class="chip on">muse-spark-1.2-contributor</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-dim)" id="lastRunInfo">нет запусков</span>
+      </div>
     </div>
+  </div>
+</div>
 
-    <!-- TAB: Providers -->
-    <div class="tab-content" id="tab-providers">
-        <div class="container">
-            <div class="card full-width">
-                <div class="card-title">🔧 LLM Провайдеры</div>
-                <p style="color:var(--text-dim); font-size:12px; margin-bottom:14px;">
-                    Выберите провайдера и добавьте API ключ. Активный провайдер (первый включённый с ключом) будет использоваться агентом.
-                </p>
-                <div class="provider-grid" id="providerGrid"></div>
-            </div>
-        </div>
+<!-- RESULTS -->
+<div class="tab-content" id="tab-results">
+  <div class="container">
+    <div class="card full-width">
+      <div class="card-title"><span class="dot"></span> Выводы агента и бизнес-обоснования</div>
+      <p style="color:var(--text-dim);font-size:12px;margin-bottom:14px">Таблица 12 сценариев × 3 ковенанта. Разверни строку, чтобы увидеть reasoning и Mermaid-граф логики. Evidence null — честный вывод, когда нет единственной транзакции-улики.</p>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <button class="btn-secondary" onclick="evaluate()">📊 Сверка с эталоном</button>
+        <a href="/api/submission" target="_blank" style="text-decoration:none"><button class="btn-secondary">📄 submission.json</button></a>
+        <a href="/api/download_submission" target="_blank" style="text-decoration:none"><button class="btn-primary" style="margin-left:auto">💾 Скачать ZIP для отправки</button></a>
+      </div>
+      <div style="overflow:auto;border:1px solid var(--border);border-radius:10px">
+        <table class="answers-table">
+          <thead><tr>
+            <th>Сценарий</th><th>6.1 статус</th><th>actual</th><th>evidence</th><th>6.2 статус</th><th>actual</th><th>evidence</th><th>6.3 статус</th><th>actual</th><th>evidence</th>
+          </tr></thead>
+          <tbody id="answersBody"></tbody>
+        </table>
+      </div>
+      <div id="evalResults" style="margin-top:18px"></div>
     </div>
+  </div>
+</div>
 
-    <!-- TAB: Logs -->
-    <div class="tab-content" id="tab-logs">
-        <div class="container">
-            <div class="card full-width">
-                <div class="card-title">📝 Логи агента (real-time)</div>
-                <button class="btn-danger btn-small" onclick="clearCache()" style="margin-bottom: 12px;">🗑️ Очистить кэш</button>
-                <div class="log-container" id="logContainer"></div>
-            </div>
-        </div>
+<!-- METRICS -->
+<div class="tab-content" id="tab-metrics">
+  <div class="container">
+    <div class="card full-width">
+      <div class="card-title"><span class="dot" style="background:var(--accent)"></span> Честные замеры — сравнение моделей и история запусков</div>
+      <p style="color:var(--text-dim);font-size:12px;margin-bottom:14px">Источник правды — локальный evaluator (кейс Halyk). История хранится в cache/history.json и переживает перезапуски. Рекомендуемая модель выделена.</p>
+      <div style="overflow:auto;border:1px solid var(--border);border-radius:10px">
+        <table class="metrics-table">
+          <thead><tr><th>Время</th><th>Инициатор</th><th>Модель</th><th>Сценарии</th><th>Время (с)</th><th>Точность</th></tr></thead>
+          <tbody id="metricsBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn-secondary btn-small" onclick="loadMetrics()">🔄 Обновить таблицу</button>
+        <span style="font-size:11px;color:var(--text-dim);align-self:center">Показатель «Точность» = weighted score (status 0.5 / actual 0.3 / evidence 0.2). Честно — без ручной правки ответов.</span>
+      </div>
     </div>
+  </div>
+</div>
 
-    <div class="toast" id="toast"></div>
-
-    <!-- Edit Answer Modal -->
-    <div class="modal-overlay" id="editModal">
-        <div class="modal" style="max-width: 600px;">
-            <h2>✏️ Редактирование Ответа Агента</h2>
-            <div style="margin-bottom: 12px; font-size: 12px; color: var(--text-dim);">
-                Сценарий: <strong id="editScenarioId" style="color:var(--text)"></strong> | 
-                Ковенант: <strong id="editCovenantId" style="color:var(--text)"></strong>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                <div>
-                    <label style="font-size: 11px; color: var(--text-dim);">Статус</label>
-                    <select id="editStatus" style="width: 100%; padding: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 12px; margin-top: 4px;">
-                        <option value="COMPLIANT">COMPLIANT</option>
-                        <option value="BREACH">BREACH</option>
-                    </select>
-                </div>
-                <div>
-                    <label style="font-size: 11px; color: var(--text-dim);">Фактическое значение (Actual)</label>
-                    <input type="number" step="0.01" id="editActual" style="width: 100%; padding: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 12px; margin-top: 4px;" />
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 12px;">
-                <label style="font-size: 11px; color: var(--text-dim);">Обоснование (Reasoning)</label>
-                <textarea id="editReasoning" rows="4" style="width: 100%; padding: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 12px; margin-top: 4px; resize: vertical;"></textarea>
-            </div>
-
-            <div id="evidenceContainer" style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px; display: none;">
-                <div style="font-size: 11px; color: var(--accent); margin-bottom: 6px; font-weight: 600;">🧾 Доказательство (Транзакция)</div>
-                <div id="evidenceContent" style="font-family: monospace; font-size: 11px; line-height: 1.5; color: var(--text-dim);">Загрузка...</div>
-            </div>
-            
-            <div class="modal-buttons">
-                <button class="btn-secondary" onclick="document.getElementById('editModal').style.display='none'">Отмена</button>
-                <button class="btn-primary" onclick="saveEdit()">Сохранить изменения</button>
-            </div>
-        </div>
+<!-- PROVIDERS -->
+<div class="tab-content" id="tab-providers">
+  <div class="container">
+    <div class="card full-width">
+      <div class="card-title"><span class="dot"></span> LLM провайдеры — muse-spark как основной</div>
+      <p style="color:var(--text-dim);font-size:12px;margin-bottom:14px">Включи нужный провайдер и вставь API ключ. Активным считается первый включённый с валидным ключом. По замерам Halyk — <b style="color:var(--accent)">muse-spark-1.2-contributor</b> показывает лучший баланс скорости и точности.</p>
+      <div class="provider-grid" id="providerGrid"></div>
+      <div style="margin-top:14px;background:var(--accent-dim);border:1px solid #1DB95433;border-radius:10px;padding:12px;display:flex;gap:10px;align-items:center">
+        <span style="font-size:18px">💡</span>
+        <div style="font-size:12px;color:var(--text)"><b>Почему muse-spark?</b> На датасете Halyk он даёт стабильные reasoning, корректные коэффициенты и аккуратные evidence. Gemini оставлен как fallback для PDF-vision.</div>
+      </div>
     </div>
+  </div>
+</div>
 
-    <div class="modal-overlay" id="hitlModal">
-        <div class="modal">
-            <h2>⚠️ Ожидается Решение Аналитика</h2>
-            <p id="hitlQuestion">Агент обнаружил спорную транзакцию и нуждается в вашей помощи.</p>
-            <input type="text" id="hitlInput" placeholder="Введите ваш ответ (например: Исключить) ..." />
-            <div class="modal-buttons" style="margin-top:16px;">
-                <button class="btn-primary" onclick="resolveHitl()">Отправить ответ агенту</button>
-            </div>
-        </div>
+<!-- LOGS -->
+<div class="tab-content" id="tab-logs">
+  <div class="container">
+    <div class="card full-width">
+      <div class="card-title"><span class="dot"></span> Логи агента (real-time)</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn-danger btn-small" onclick="clearCache()">🗑️ Очистить кэш</button>
+        <span style="font-size:11px;color:var(--text-dim);align-self:center">Кэш: extracted_texts.json + document_index.json — без очистки агент использует кэш для скорости.</span>
+      </div>
+      <div class="log-container" id="logContainer"></div>
     </div>
+  </div>
+</div>
 
-    <!-- Chat Modal -->
-    <div class="modal-overlay" id="chatModal">
-        <div class="modal" style="max-width: 600px;">
-            <h2>💬 Halyk AI: Обсуждение Ковенанта</h2>
-            <div style="margin-bottom: 12px; font-size: 12px; color: var(--text-dim);">
-                Сценарий: <strong id="chatScenarioId" style="color:var(--text)"></strong> | 
-                Ковенант: <strong id="chatCovenantId" style="color:var(--text)"></strong>
-            </div>
-            
-            <div id="chatHistory" style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; height: 300px; overflow-y: auto; margin-bottom: 16px; font-size: 13px; display: flex; flex-direction: column; gap: 12px; line-height: 1.5;">
-                <div style="color: var(--text-dim); text-align: center; margin-top: 100px;">Задайте вопрос по этому сценарию. Я помогу разобраться в расчетах!</div>
-            </div>
-            
-            <div style="display: flex; gap: 8px;">
-                <input type="text" id="chatInput" placeholder="Введите ваш вопрос..." style="margin: 0; flex: 1; padding: 10px;" onkeypress="if(event.key === 'Enter') sendChatMessage()" />
-                <button class="btn-primary" onclick="sendChatMessage()" id="btnSendChat">Отправить</button>
-            </div>
-            
-            <div class="modal-buttons" style="margin-top: 16px;">
-                <button class="btn-secondary" onclick="document.getElementById('chatModal').style.display='none'">Закрыть</button>
-            </div>
-        </div>
+<div class="toast" id="toast"></div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h2>✏️ Редактирование ответа</h2>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px">Сценарий <strong id="editScenarioId" style="color:var(--text)"></strong> · Ковенант <strong id="editCovenantId" style="color:var(--text)"></strong></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:11px;color:var(--text-dim)">Статус</label><select id="editStatus"><option value="COMPLIANT">COMPLIANT</option><option value="BREACH">BREACH</option></select></div>
+      <div><label style="font-size:11px;color:var(--text-dim)">Actual</label><input type="number" step="0.01" id="editActual"/></div>
     </div>
-
-    <script>
-        const SCENARIOS = ['P1','P2','P3','P4','P5','P6','P7','P8','P9','P10','B1','B4'];
-        let ws = null;
-        let isAgentRunning = false;
-
-        // ── Tabs ──
-        function switchTab(name) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.getElementById('tab-' + name).classList.add('active');
-            event.target.classList.add('active');
-            if (name === 'providers') loadProviders();
-            if (name === 'metrics') loadMetrics();
-        }
-
-        // ── Toast ──
-        function showToast(msg, type='success') {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.className = 'toast ' + type;
-            t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 3000);
-        }
-
-        // ── WebSocket ──
-        function connectWS() {
-            const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-            ws = new WebSocket(`${proto}://${location.host}/ws/logs`);
-            ws.onmessage = (e) => {
-                const el = document.getElementById('logContainer');
-                const div = document.createElement('div');
-                div.textContent = e.data;
-                el.appendChild(div);
-                el.scrollTop = el.scrollHeight;
-            };
-            ws.onclose = () => setTimeout(connectWS, 2000);
-        }
-        connectWS();
-
-        // ── Metrics ──
-        async function loadMetrics() {
-            const r = await fetch('/api/metrics');
-            const data = await r.json();
-            const tbody = document.getElementById('metricsBody');
-            let html = '';
-            
-            if (data.history && Array.isArray(data.history)) {
-                [...data.history].reverse().forEach(run => {
-                    const date = new Date(run.timestamp).toLocaleString('ru-RU');
-                    html += `<tr>
-                        <td>${date}</td>
-                        <td>${run.initiator || 'Система'}</td>
-                        <td><strong style="color:var(--accent)">${run.model}</strong></td>
-                        <td>${run.scenarios.join(', ')}</td>
-                        <td>${run.duration_sec.toFixed(1)} с</td>
-                        <td><strong style="color:var(--blue)">${run.accuracy || '0%'}</strong> (${run.correct || 0}/${run.total || 0})</td>
-                    </tr>`;
-                });
-            }
-            if (!html) html = `<tr><td colspan="6" style="text-align:center">Нет истории запусков</td></tr>`;
-            tbody.innerHTML = html;
-        }
-
-        // ── Providers ──
-        async function loadProviders() {
-            const r = await fetch('/api/providers');
-            const providers = await r.json();
-            const grid = document.getElementById('providerGrid');
-            grid.innerHTML = '';
-            
-            for (const [pid, cfg] of Object.entries(providers)) {
-                const isActive = cfg.enabled && cfg.api_key_set;
-                const card = document.createElement('div');
-                card.className = 'provider-card' + (isActive ? ' active' : '');
-                card.innerHTML = `
-                    <div class="p-header">
-                        <div>
-                            <div class="p-name">${cfg.name}</div>
-                            <div class="p-model">${cfg.models.fast}</div>
-                        </div>
-                        <label class="toggle">
-                            <input type="checkbox" ${cfg.enabled ? 'checked' : ''} 
-                                   onchange="toggleProvider('${pid}', this.checked)">
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <input type="password" id="key-${pid}" 
-                           placeholder="API Key" 
-                           value="${cfg.api_key_set ? cfg.api_key_masked : ''}"
-                           onfocus="if(this.value.includes('...')) this.value=''">
-                    <div style="display:flex; gap:6px; margin-top:8px;">
-                        <button class="btn-secondary btn-small" onclick="saveKey('${pid}')">💾 Сохранить</button>
-                        <button class="btn-secondary btn-small" onclick="testProvider('${pid}')">🧪 Тест</button>
-                    </div>
-                    <div class="p-status ${isActive ? 'p-status-on' : 'p-status-off'}" 
-                         style="margin-top:8px; display:inline-block;">
-                        ${isActive ? '● Active' : '○ Inactive'}
-                    </div>
-                `;
-                grid.appendChild(card);
-            }
-        }
-
-        async function saveKey(pid) {
-            const key = document.getElementById('key-' + pid).value;
-            if (!key || key.includes('...')) return showToast('Введите API ключ', 'error');
-            const r = await fetch('/api/providers', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({provider_id: pid, api_key: key, enabled: true})
-            });
-            const data = await r.json();
-            if (data.ok) { showToast('Ключ сохранён ✅'); loadProviders(); }
-            else showToast('Ошибка: ' + data.error, 'error');
-        }
-
-        async function toggleProvider(pid, enabled) {
-            await fetch('/api/providers', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({provider_id: pid, enabled})
-            });
-            loadProviders();
-        }
-
-        async function testProvider(pid) {
-            const key = document.getElementById('key-' + pid).value;
-            showToast('Тестирую...', 'success');
-            const r = await fetch('/api/providers/test', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({provider_id: pid, api_key: key || undefined})
-            });
-            const data = await r.json();
-            showToast(data.message, data.ok ? 'success' : 'error');
-        }
-
-        // ── Agent ──
-        async function runAgent(scenarios = null) {
-            if (isAgentRunning) return;
-            isAgentRunning = true;
-            document.getElementById('btnRunAll').disabled = true;
-            document.getElementById('btnRunP1').disabled = true;
-            document.getElementById('runAllIcon').className = 'loading-spinner';
-            document.getElementById('runAllIcon').textContent = '';
-            
-            showToast('Запуск анализа...', 'success');
-            await fetch('/api/run', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(scenarios ? {scenarios} : {})
-            });
-            pollStatus();
-        }
-
-        async function refreshAll() {
-            await refreshStatus();
-            await refreshAnswers();
-        }
-
-        async function refreshStatus() {
-            const r = await fetch('/api/status');
-            const data = await r.json();
-            updateStatus(data);
-        }
-
-        async function refreshAnswers() {
-            const r = await fetch('/api/answers');
-            const answers = await r.json();
-            renderAnswers(answers);
-        }
-
-        async function evaluate() {
-            const r = await fetch('/api/evaluate');
-            const data = await r.json();
-            if (data.error) {
-                document.getElementById('scoreValue').textContent = '—';
-                document.getElementById('scoreDetail').textContent = data.error;
-                return;
-            }
-            document.getElementById('scoreValue').textContent = data.percentage.toFixed(1) + '%';
-            document.getElementById('scoreDetail').textContent = 
-                `${data.total_score.toFixed(2)} / ${data.max_score.toFixed(2)} баллов (${data.cells_scored} ячеек)`;
-            
-            // Detailed results
-            let html = `
-            <div class="card-title" style="margin-top: 15px;">Детализация Оценки (Сверка с эталоном)</div>
-            <table class="answers-table" style="background: var(--surface2); border-radius: 8px; overflow: hidden;">
-                <thead><tr>
-                    <th style="background: var(--bg)">Проверка</th>
-                    <th style="background: var(--bg)">Статус (0.5)</th>
-                    <th style="background: var(--bg)">Сумма (0.3)</th>
-                    <th style="background: var(--bg)">Док. (0.2)</th>
-                    <th style="background: var(--bg)">Итог</th>
-                    <th style="background: var(--bg)">Ошибки</th>
-                </tr></thead>
-                <tbody>`;
-                
-            let hasValidRows = false;
-            for (const [cell, score] of Object.entries(data.cells).sort()) {
-                if (score.total === 0 && score.details === "Cell missing") continue; // Skip empty cells
-                hasValidRows = true;
-                const color = score.total > 0.8 ? 'var(--compliant)' : score.total > 0.4 ? 'var(--warning)' : 'var(--breach)';
-                html += `<tr>
-                    <td><strong>${cell}</strong></td>
-                    <td style="color:${score.status_score > 0 ? 'var(--compliant)' : 'var(--breach)'}">${score.status_score.toFixed(2)}</td>
-                    <td style="color:${score.actual_score > 0 ? 'var(--compliant)' : 'var(--breach)'}">${score.actual_score.toFixed(2)}</td>
-                    <td style="color:${score.evidence_score > 0 ? 'var(--compliant)' : 'var(--breach)'}">${score.evidence_score.toFixed(2)}</td>
-                    <td style="color:${color}; font-weight:600">${score.total.toFixed(2)}</td>
-                    <td style="font-size:10px; color:var(--text-dim)">${score.details || '—'}</td>
-                </tr>`;
-            }
-            if (!hasValidRows) {
-                html += `<tr><td colspan="6" style="text-align:center; padding: 20px;">Нет данных для оценки. Запустите анализ.</td></tr>`;
-            }
-            html += '</tbody></table>';
-            document.getElementById('evalResults').innerHTML = html;
-        }
-
-        async function clearCache() {
-            if (!confirm('Очистить кэш извлечённых текстов и индекса?')) return;
-            await fetch('/api/clear-cache', {method: 'POST'});
-            showToast('Кэш очищен 🗑️');
-        }
-
-        let hitlActive = false;
-
-        function pollStatus() {
-            const interval = setInterval(async () => {
-                const r = await fetch('/api/status');
-                const data = await r.json();
-                updateStatus(data);
-                await refreshAnswers();
-                
-                // Check HITL
-                const h = await fetch('/api/hitl/pending');
-                const hitl = await h.json();
-                if (hitl.pending && !hitlActive) {
-                    hitlActive = true;
-                    document.getElementById('hitlModal').style.display = 'flex';
-                    document.getElementById('hitlQuestion').innerHTML = 
-                        `<strong>Транзакция:</strong> ${hitl.transaction_id}<br><br>${hitl.question}`;
-                }
-                
-                if (data.state !== 'running') {
-                    clearInterval(interval);
-                    isAgentRunning = false;
-                    hitlActive = false;
-                    document.getElementById('hitlModal').style.display = 'none';
-                    document.getElementById('btnRunAll').disabled = false;
-                    document.getElementById('btnRunP1').disabled = false;
-                    document.getElementById('runAllIcon').className = '';
-                    document.getElementById('runAllIcon').textContent = '▶';
-                    
-                    if (data.state === 'done') {
-                        await evaluate();
-                        showToast('✅ Анализ завершен, результаты готовы!');
-                        // Switch to results tab automatically to show the user it finished
-                        document.querySelectorAll('.tab')[1].click(); 
-                    }
-                }
-            }, 3000);
-        }
-        
-        async function resolveHitl() {
-            const decision = document.getElementById('hitlInput').value;
-            if (!decision) return showToast('Введите ответ!', 'error');
-            
-            await fetch('/api/hitl/resolve', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({decision})
-            });
-            document.getElementById('hitlInput').value = '';
-            document.getElementById('hitlModal').style.display = 'none';
-            hitlActive = false;
-            showToast('Ответ отправлен агенту!');
-        }
-
-        // ── Chat Modal Logic ──
-        let currentChatSid = null;
-        let currentChatCid = null;
-
-        function openChatModal(sid, cid) {
-            currentChatSid = sid;
-            currentChatCid = cid;
-            document.getElementById('chatScenarioId').textContent = sid;
-            document.getElementById('chatCovenantId').textContent = cid;
-            document.getElementById('chatHistory').innerHTML = '<div style="color: var(--text-dim); text-align: center; margin-top: 100px;">Задайте вопрос по этому сценарию. Я помогу разобраться в расчетах!</div>';
-            document.getElementById('chatInput').value = '';
-            document.getElementById('chatModal').style.display = 'flex';
-            setTimeout(() => document.getElementById('chatInput').focus(), 100);
-        }
-
-        async function sendChatMessage() {
-            const inputEl = document.getElementById('chatInput');
-            const btnEl = document.getElementById('btnSendChat');
-            const historyEl = document.getElementById('chatHistory');
-            const message = inputEl.value.trim();
-            
-            if (!message) return;
-            
-            if (historyEl.innerHTML.includes('Задайте вопрос')) {
-                historyEl.innerHTML = '';
-            }
-            
-            historyEl.innerHTML += `<div style="align-self: flex-end; background: var(--surface2); padding: 8px 12px; border-radius: 12px 12px 0 12px; max-width: 85%; color: var(--text);"><b>Вы:</b><br>${escapeHtml(message)}</div>`;
-            inputEl.value = '';
-            historyEl.scrollTop = historyEl.scrollHeight;
-            
-            inputEl.disabled = true;
-            btnEl.disabled = true;
-            btnEl.innerHTML = '<span class="loading-spinner"></span>';
-            
-            try {
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        scenario_id: currentChatSid,
-                        covenant_id: currentChatCid,
-                        message: message
-                    })
-                });
-                const data = await res.json();
-                
-                if (data.error) {
-                    historyEl.innerHTML += `<div style="align-self: flex-start; background: var(--breach-dim); padding: 8px 12px; border-radius: 12px 12px 12px 0; max-width: 85%; color: var(--breach);"><b>Ошибка:</b><br>${escapeHtml(data.error)}</div>`;
-                } else {
-                    let formattedReply = data.reply.replace(/\n/g, '<br>');
-                    historyEl.innerHTML += `<div style="align-self: flex-start; background: var(--accent-dim); padding: 8px 12px; border-radius: 12px 12px 12px 0; max-width: 85%; color: var(--text); border: 1px solid var(--accent);"><b>🤖 Агент:</b><br>${formattedReply}</div>`;
-                }
-            } catch (e) {
-                historyEl.innerHTML += `<div style="align-self: flex-start; background: var(--breach-dim); padding: 8px 12px; border-radius: 12px 12px 12px 0; max-width: 85%; color: var(--breach);"><b>Ошибка сети:</b><br>${e.message}</div>`;
-            } finally {
-                inputEl.disabled = false;
-                btnEl.disabled = false;
-                btnEl.innerHTML = 'Отправить';
-                historyEl.scrollTop = historyEl.scrollHeight;
-                setTimeout(() => inputEl.focus(), 100);
-            }
-        }
-
-        // ── Answer Editing ──
-        async function openEditModal(sid, cid) {
-            const r = await fetch('/api/answers');
-            const answers = await r.json();
-            const cell = answers[sid]?.[cid];
-            if (!cell) return;
-            
-            document.getElementById('editScenarioId').textContent = sid;
-            document.getElementById('editCovenantId').textContent = cid;
-            document.getElementById('editStatus').value = cell.status;
-            document.getElementById('editActual').value = cell.actual;
-            document.getElementById('editReasoning').value = cell.reasoning || '';
-            
-            const evContainer = document.getElementById('evidenceContainer');
-            const evContent = document.getElementById('evidenceContent');
-            if (cell.evidence_txn_id) {
-                evContainer.style.display = 'block';
-                evContent.innerHTML = `Транзакция <strong>${cell.evidence_txn_id}</strong>... загрузка деталей`;
-                try {
-                    const txR = await fetch(`/api/transaction/${sid}/${cell.evidence_txn_id}`);
-                    if (txR.ok) {
-                        const tx = await txR.json();
-                        evContent.innerHTML = `
-                            <strong>ID:</strong> ${tx.txn_id} &nbsp;|&nbsp; <strong>Дата:</strong> ${tx.date}<br>
-                            <strong>Сумма:</strong> ${tx.amount} ${tx.currency}<br>
-                            <strong>Контрагент:</strong> ${escapeHtml(tx.counterparty || '—')}<br>
-                            <strong>Назначение:</strong> ${escapeHtml(tx.description || '—')}
-                        `;
-                    } else {
-                        evContent.innerHTML = `Не удалось найти транзакцию ${cell.evidence_txn_id} в леджере.`;
-                    }
-                } catch(e) {
-                    evContent.innerHTML = `Ошибка загрузки транзакции.`;
-                }
-            } else {
-                evContainer.style.display = 'none';
-            }
-            
-            document.getElementById('editModal').style.display = 'flex';
-        }
-
-        async function saveEdit() {
-            const sid = document.getElementById('editScenarioId').textContent;
-            const cid = document.getElementById('editCovenantId').textContent;
-            const status = document.getElementById('editStatus').value;
-            const actual = parseFloat(document.getElementById('editActual').value);
-            const reasoning = document.getElementById('editReasoning').value;
-            
-            const r = await fetch('/api/edit_answer', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    scenario_id: sid,
-                    covenant_id: cid,
-                    status: status,
-                    actual: actual,
-                    reasoning: reasoning
-                })
-            });
-            
-            if (r.ok) {
-                document.getElementById('editModal').style.display = 'none';
-                showToast('Изменения сохранены! ✅');
-                await refreshAnswers();
-                await evaluate(); // Re-evaluate ground truth if possible
-            } else {
-                showToast('Ошибка при сохранении', 'error');
-            }
-        }
-
-        function updateStatus(data) {
-            const badge = document.getElementById('statusBadge');
-            badge.textContent = data.state.toUpperCase();
-            badge.className = 'status-badge status-' + data.state;
-
-            const pct = data.total > 0 ? ((data.total - data.pending || 0) / data.total * 100) : 0;
-            document.getElementById('progressFill').style.width = (data.state === 'done' ? 100 : pct) + '%';
-            document.getElementById('progressText').textContent = 
-                data.state === 'running' ? `Анализ: ${data.current_scenario || '...'} (${data.progress}/${data.total})` :
-                data.state === 'done' ? 'Завершено ✅' :
-                data.state === 'error' ? `Ошибка: ${data.error}` : 'Система готова к запуску';
-        }
-
-        async function uploadDataset(file) {
-            if (!file) return;
-            const btn = document.getElementById('btnUpload');
-            const icon = document.getElementById('uploadIcon');
-            
-            icon.className = 'loading-spinner';
-            icon.textContent = '';
-            btn.disabled = true;
-            
-            showToast('Загрузка датасета и обработка...', 'success');
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            try {
-                const r = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await r.json();
-                if (data.ok) {
-                    showToast('Датасет загружен. Запускаем анализ...', 'success');
-                    runAgent();
-                } else {
-                    showToast('Ошибка: ' + data.error, 'error');
-                }
-            } catch (e) {
-                showToast('Ошибка сети', 'error');
-            } finally {
-                icon.className = '';
-                icon.textContent = '📁';
-                btn.disabled = false;
-                document.getElementById('datasetUpload').value = '';
-            }
-        }
-
-        function formatCurrency(val) {
-            if (val == null || val === 'null' || val === '') return '—';
-            return '$' + Number(val).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        }
-        
-        function formatRatio(val) {
-            if (val == null || val === 'null' || val === '') return '—';
-            return Number(val).toFixed(2) + 'x';
-        }
-
-        function escapeHtml(text) {
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
-        }
-
-        function renderAnswers(answers) {
-            const tbody = document.getElementById('answersBody');
-            let html = '', filled = 0, breach = 0, compliant = 0;
-            for (const sid of SCENARIOS) {
-                if (!answers[sid]) continue;
-                
-                let hasData = false;
-                let detailsId = `details-${sid}`;
-                let rowHtml = `<tr style="cursor: pointer;" onclick="const d = document.getElementById('${detailsId}'); if(d) d.style.display = d.style.display === 'none' ? 'table-row' : 'none'">
-                    <td>
-                        <button class="btn-secondary btn-small" style="margin-right: 6px; padding: 2px 6px; font-size: 10px;">▼</button>
-                        <strong style="color:var(--accent); font-size:14px;">${sid}</strong>
-                    </td>`;
-                let comments = [];
-                
-                for (const cid of ['6.1', '6.2', '6.3']) {
-                    const cell = answers[sid]?.[cid];
-                    if (cell && cell.status) {
-                        hasData = true;
-                        filled++;
-                        if (cell.status === 'BREACH') breach++;
-                        if (cell.status === 'COMPLIANT') compliant++;
-                        const tag = cell.status === 'BREACH' ? 'tag-breach' : 'tag-compliant';
-                        
-                        let cellHtml = `<td><span class="${tag}">${cell.status}</span></td>`;
-                        
-                        // Formatting logic
-                        let actualVal = cell.actual;
-                        if (cid === '6.1') {
-                            actualVal = formatRatio(cell.actual);
-                        } else {
-                            actualVal = formatCurrency(cell.actual);
-                        }
-                        
-                        cellHtml += `<td>${actualVal}</td>`;
-                        cellHtml += `<td style="font-size: 10px; color: var(--text-dim); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${cell.evidence_txn_id || '—'}">${cell.evidence_txn_id || '—'}</td>`;
-                        
-                        if (cell.reasoning) {
-                            // Formatting reasoning as a nice card
-                            let comment = `<div style="background: var(--surface2); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(${cell.status === 'BREACH' ? '--breach' : '--compliant'}); position: relative;">`;
-                            
-                            comment += `<button class="btn-secondary btn-small" onclick="openEditModal('${sid}', '${cid}')" style="position: absolute; right: 12px; top: 12px;">✏️ Изменить</button>`;
-                            comment += `<button class="btn-secondary btn-small" onclick="openChatModal('${sid}', '${cid}')" style="position: absolute; right: 105px; top: 12px;">💬 Обсудить</button>`;
-                            
-                            comment += `<strong>Ковенант ${cid}</strong> <span class="${tag}" style="font-size: 10px; margin-left: 5px;">${cell.status}</span><br>`;
-                            
-                            // Make bullet points look nice
-                            let formattedReasoning = cell.reasoning.replace(/\n\u2022/g, '<br>•').replace(/\n-/g, '<br>&nbsp;&nbsp;-');
-                            comment += `<div style="margin-top: 8px; font-size: 12px; line-height: 1.5; color: #d0d4e0;">${formattedReasoning}</div>`;
-                            
-                            if (cell.graph_mermaid) {
-                                const mId = `mermaid-${sid}-${cid.replace('.','')}`;
-                                comment += `<div style="margin-top: 10px;"><button class="btn-secondary btn-small" onclick="toggleMermaid(this, '${mId}')">Показать визуализацию логики</button></div>`;
-                                // Hidden code block
-                                comment += `<div id="${mId}-code" style="display:none;">${escapeHtml(cell.graph_mermaid)}</div>`;
-                                // Actual rendering block
-                                comment += `<div id="${mId}" style="display:none; margin-top: 10px; background: #0a0c10; padding: 15px; border-radius: 8px; overflow-x: auto;"></div>`;
-                            }
-                            comment += `</div>`;
-                            comments.push(comment);
-                        }
-                        rowHtml += cellHtml;
-                    } else {
-                        rowHtml += '<td class="tag-empty">—</td><td class="tag-empty">—</td><td class="tag-empty">—</td>';
-                    }
-                }
-                rowHtml += '</tr>';
-                
-                if (hasData) {
-                    html += rowHtml;
-                    if (comments.length > 0) {
-                        let hasBreach = comments.some(c => c.includes('tag-breach'));
-                        let displayStyle = hasBreach ? 'table-row' : 'none';
-                        html += `<tr id="${detailsId}" style="display: ${displayStyle};">
-                            <td colspan="10" style="padding: 15px 20px; font-size: 12px; background: var(--bg); border-bottom: 1px solid var(--border);">
-                                <div style="color: var(--text-dim); font-weight: 600; margin-bottom: 8px; text-transform: uppercase; font-size: 11px;">Бизнес-выводы AI Агента по сценарию ${sid}</div>
-                                ${comments.join('')}
-                            </td>
-                        </tr>`;
-                    }
-                }
-            }
-            tbody.innerHTML = html;
-
-            document.getElementById('statFilled').textContent = filled;
-            document.getElementById('statBreach').textContent = breach;
-            document.getElementById('statCompliant').textContent = compliant;
-        }
-
-        // Initially refresh
-        refreshAll().then(() => evaluate());
-
-        // --- GLOBAL CHAT WIDGET ---
-        function toggleGlobalChat() {
-            const chat = document.getElementById('globalChatModal');
-            if (chat.style.display === 'none' || !chat.style.display) {
-                chat.style.display = 'flex';
-            } else {
-                chat.style.display = 'none';
-            }
-        }
-
-        async function sendGlobalChatMessage() {
-            const input = document.getElementById('globalChatInput');
-            const msg = input.value.trim();
-            if (!msg) return;
-            
-            input.value = '';
-            
-            const history = document.getElementById('globalChatHistory');
-            history.innerHTML += `<div style="margin-bottom: 10px; text-align: right;"><span style="background: var(--primary); padding: 8px 12px; border-radius: 12px; display: inline-block; max-width: 80%;">${escapeHtml(msg)}</span></div>`;
-            history.scrollTop = history.scrollHeight;
-            
-            // Show typing indicator
-            const typingId = 'typing-' + Date.now();
-            history.innerHTML += `<div id="${typingId}" style="margin-bottom: 10px; text-align: left;"><span style="background: var(--surface2); padding: 8px 12px; border-radius: 12px; display: inline-block; color: var(--text-dim);">Halyk AI думает...</span></div>`;
-            history.scrollTop = history.scrollHeight;
-            
-            try {
-                const r = await fetch('/api/global_chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ message: msg })
-                });
-                
-                document.getElementById(typingId).remove();
-                
-                if (r.ok) {
-                    const data = await r.json();
-                    let reply = escapeHtml(data.reply).replace(/\n/g, '<br>');
-                    history.innerHTML += `<div style="margin-bottom: 10px; text-align: left;"><span style="background: var(--surface2); padding: 8px 12px; border-radius: 12px; display: inline-block; max-width: 80%; color: #d0d4e0;">${reply}</span></div>`;
-                    
-                    // If the reply implies a run or state change, refresh dashboard
-                    if (data.reply.includes('Запускаю') || data.reply.includes('меняю')) {
-                        setTimeout(() => refreshAll(), 1500);
-                    }
-                } else {
-                    const err = await r.json();
-                    history.innerHTML += `<div style="margin-bottom: 10px; text-align: left;"><span style="background: var(--breach); padding: 8px 12px; border-radius: 12px; display: inline-block;">Ошибка: ${err.error}</span></div>`;
-                }
-            } catch (e) {
-                document.getElementById(typingId)?.remove();
-                history.innerHTML += `<div style="margin-bottom: 10px; text-align: left;"><span style="background: var(--breach); padding: 8px 12px; border-radius: 12px; display: inline-block;">Ошибка сети.</span></div>`;
-            }
-            history.scrollTop = history.scrollHeight;
-        }
-        
-        document.getElementById('globalChatInput')?.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') sendGlobalChatMessage();
-        });
-    </script>
-
-    <!-- Floating Global Chat Button -->
-    <button onclick="toggleGlobalChat()" style="position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 30px; background: var(--primary); color: white; border: none; font-size: 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; transition: all 0.2s;">
-        🤖
-    </button>
-
-    <!-- Global Chat Window -->
-    <div id="globalChatModal" style="display: none; position: fixed; bottom: 100px; right: 30px; width: 350px; height: 500px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); z-index: 1000; flex-direction: column; overflow: hidden;">
-        <div style="padding: 15px; background: var(--surface2); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <strong style="font-size: 16px;">Halyk AI 🤖</strong>
-            <button onclick="toggleGlobalChat()" style="background:none; border:none; color:var(--text); font-size:16px; cursor:pointer;">✖</button>
-        </div>
-        
-        <div id="globalChatHistory" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; font-size: 13px;">
-            <div style="margin-bottom: 10px; text-align: left;">
-                <span style="background: var(--surface2); padding: 8px 12px; border-radius: 12px; display: inline-block; max-width: 80%; color: #d0d4e0;">
-                    Привет! Я Halyk AI. Вы можете попросить меня запустить сценарий, сменить модель или уточнить статусы. Чем могу помочь?
-                </span>
-            </div>
-        </div>
-        
-        <div style="padding: 10px 15px; background: var(--surface2); border-top: 1px solid var(--border); display: flex; gap: 10px;">
-            <input type="text" id="globalChatInput" placeholder="Напишите команду..." style="flex:1; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none;">
-            <button onclick="sendGlobalChatMessage()" class="btn-primary" style="padding: 0 15px;">➤</button>
-        </div>
+    <div style="margin-bottom:12px"><label style="font-size:11px;color:var(--text-dim)">Обоснование (reasoning)</label><textarea id="editReasoning" rows="4"></textarea></div>
+    <div id="evidenceContainer" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;display:none">
+      <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:6px">🧾 Доказательство (транзакция)</div>
+      <div id="evidenceContent" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">Загрузка…</div>
     </div>
+    <div class="modal-buttons">
+      <button class="btn-secondary" onclick="document.getElementById('editModal').style.display='none'">Отмена</button>
+      <button class="btn-primary" onclick="saveEdit()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="hitlModal">
+  <div class="modal">
+    <h2>⚠️ Требуется решение аналитика</h2>
+    <p id="hitlQuestion"></p>
+    <input type="text" id="hitlInput" placeholder="Введите ответ (например: Исключить)"/>
+    <div class="modal-buttons" style="margin-top:16px"><button class="btn-primary" onclick="resolveHitl()">Отправить агенту</button></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="chatModal">
+  <div class="modal" style="max-width:640px">
+    <h2>💬 Halyk AI — обсуждение ковенанта</h2>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px">Сценарий <strong id="chatScenarioId" style="color:var(--text)"></strong> · Ковенант <strong id="chatCovenantId" style="color:var(--text)"></strong></div>
+    <div id="chatHistory" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;font-size:13px;line-height:1.6"><div style="color:var(--text-dim);text-align:center;margin-top:90px">Задай вопрос по расчёту — объясню логику без технарщины.</div></div>
+    <div style="display:flex;gap:8px;margin-top:12px"><input type="text" id="chatInput" placeholder="Твой вопрос…" style="margin:0;flex:1" onkeypress="if(event.key==='Enter')sendChatMessage()"/><button class="btn-primary" onclick="sendChatMessage()" id="btnSendChat">Отправить</button></div>
+    <div class="modal-buttons" style="margin-top:12px"><button class="btn-secondary" onclick="document.getElementById('chatModal').style.display='none'">Закрыть</button></div>
+  </div>
+</div>
+
+<script>
+const SCENARIOS=['P1','P2','P3','P4','P5','P6','P7','P8','P9','P10','B1','B4'];
+let ws=null,isAgentRunning=false;
+
+// Tabs — fixed (no global event)
+document.querySelectorAll('.tab').forEach(el=>{
+  el.addEventListener('click',()=>{
+    const name=el.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tab-'+name).classList.add('active');
+    if(name==='providers') loadProviders();
+    if(name==='metrics') loadMetrics();
+  });
+});
+function showToast(msg,type='success'){
+  const t=document.getElementById('toast');t.textContent=msg;t.className='toast '+type;t.style.display='block';setTimeout(()=>t.style.display='none',3200);
+}
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}/ws/logs`);
+  ws.onmessage=e=>{
+    const el=document.getElementById('logContainer');const div=document.createElement('div');div.textContent=e.data;el.appendChild(div);el.scrollTop=el.scrollHeight;
+  };
+  ws.onclose=()=>setTimeout(connectWS,2000);
+}
+connectWS();
+async function loadMetrics(){
+  const r=await fetch('/api/metrics');const data=await r.json();const tbody=document.getElementById('metricsBody');
+  let html='';
+  if(data.history && Array.isArray(data.history) && data.history.length){
+    [...data.history].reverse().forEach(run=>{
+      const date=new Date(run.timestamp).toLocaleString('ru-RU');
+      const isSpark=(run.model||'').includes('muse-spark');
+      html+=`<tr style="${isSpark?'background:var(--accent-dim)':''}">
+        <td>${date}</td><td>${run.initiator||'Система'}</td>
+        <td><strong style="color:${isSpark?'var(--accent)':'var(--text)'}">${run.model||'—'}</strong>${isSpark?' <span class="chip on" style="font-size:10px">muse-spark</span>':''}</td>
+        <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${(run.scenarios||[]).join(', ')}</td>
+        <td>${(run.duration_sec||0).toFixed(1)} с</td>
+        <td><strong style="color:var(--accent)">${run.accuracy||'0%'}</strong> <span style="color:var(--text-dim)">(${run.correct||0}/${run.total||0})</span></td>
+      </tr>`;
+    });
+  }
+  if(!html) html=`<tr><td colspan="6" style="text-align:center;color:var(--text-dim)">Нет истории запусков — запусти агента, чтобы увидеть честные замеры.</td></tr>`;
+  tbody.innerHTML=html;
+  if(data.history && data.history.length){
+    const last=data.history[data.history.length-1];
+    document.getElementById('lastRunInfo').textContent=`посл. запуск: ${new Date(last.timestamp).toLocaleString('ru-RU')} · ${last.model} · ${last.accuracy}`;
+  }
+}
+async function loadProviders(){
+  const r=await fetch('/api/providers');const providers=await r.json();const grid=document.getElementById('providerGrid');grid.innerHTML='';
+  for(const [pid,cfg] of Object.entries(providers)){
+    const isActive=cfg.enabled && cfg.api_key_set;
+    const isSpark=pid==='muse_spark';
+    const card=document.createElement('div');
+    card.className='provider-card'+(isActive?' active':'')+(isSpark?' recommended':'');
+    card.innerHTML=`
+      <div class="p-header"><div><div class="p-name">${cfg.name} ${isSpark?'⭐':''}</div><div class="p-model">${cfg.models.fast}</div></div>
+        <label class="toggle"><input type="checkbox" ${cfg.enabled?'checked':''} onchange="toggleProvider('${pid}',this.checked)"><span class="slider"></span></label>
+      </div>
+      <input type="password" id="key-${pid}" placeholder="API Key" value="${cfg.api_key_set?cfg.api_key_masked:''}" onfocus="if(this.value.includes('...'))this.value=''">
+      <div style="display:flex;gap:6px;margin-top:8px"><button class="btn-secondary btn-small" onclick="saveKey('${pid}')">💾 Сохранить</button><button class="btn-secondary btn-small" onclick="testProvider('${pid}')">🧪 Тест</button></div>
+      <div class="p-status ${isActive?'p-status-on':'p-status-off'}" style="margin-top:8px;display:inline-block">${isActive?'● Активен':'○ Неактивен'}</div>
+      ${isSpark?'<div style="margin-top:8px;font-size:11px;color:var(--accent)">Основная модель Halyk — выбрана по замерам</div>':''}
+    `;
+    grid.appendChild(card);
+  }
+}
+async function saveKey(pid){
+  const key=document.getElementById('key-'+pid).value;
+  if(!key || key.includes('...')) return showToast('Введи API ключ','error');
+  const r=await fetch('/api/providers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider_id:pid,api_key:key,enabled:true})});
+  const data=await r.json();if(data.ok){showToast('Ключ сохранён ✅');loadProviders();}else showToast('Ошибка: '+data.error,'error');
+}
+async function toggleProvider(pid,enabled){
+  await fetch('/api/providers',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider_id:pid,enabled})});loadProviders();
+}
+async function testProvider(pid){
+  const key=document.getElementById('key-'+pid).value;showToast('Тестирую…','success');
+  const r=await fetch('/api/providers/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider_id:pid,api_key:key||undefined})});
+  const data=await r.json();showToast(data.message,data.ok?'success':'error');
+}
+async function runAgent(scenarios=null){
+  if(isAgentRunning) return;isAgentRunning=true;
+  document.getElementById('btnRunAll').disabled=true;document.getElementById('btnRunP1').disabled=true;
+  const icon=document.getElementById('runAllIcon');icon.className='loading-spinner';icon.textContent='';
+  showToast('Запуск анализа…','success');
+  await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(scenarios?{scenarios}:{ })});
+  pollStatus();
+}
+async function refreshAll(){await refreshStatus();await refreshAnswers();}
+async function refreshStatus(){const r=await fetch('/api/status');const data=await r.json();updateStatus(data);}
+async function refreshAnswers(){const r=await fetch('/api/answers');const answers=await r.json();renderAnswers(answers);}
+async function evaluate(){
+  const r=await fetch('/api/evaluate');const data=await r.json();
+  if(data.error){document.getElementById('scoreValue').textContent='—';document.getElementById('scoreDetail').textContent=data.error;return;}
+  document.getElementById('scoreValue').textContent=data.percentage.toFixed(1)+'%';
+  document.getElementById('scoreDetail').textContent=`${data.total_score.toFixed(2)} / ${data.max_score.toFixed(2)} баллов · ${data.cells_scored} ячеек`;
+  let html=`<div class="card-title" style="margin-top:12px">Детализация (честная сверка)</div>
+  <div style="overflow:auto;border:1px solid var(--border);border-radius:10px"><table class="answers-table" style="background:var(--surface2)"><thead><tr>
+  <th>Проверка</th><th>Статус 0.5</th><th>Сумма 0.3</th><th>Док. 0.2</th><th>Итог</th><th>Примечание</th></tr></thead><tbody>`;
+  let has=false;
+  for(const [cell,score] of Object.entries(data.cells).sort()){
+    if(score.total===0 && score.details==="Cell missing") continue;
+    has=true;
+    const color=score.total>0.8?'var(--compliant)':score.total>0.4?'var(--warning)':'var(--breach)';
+    html+=`<tr><td><strong>${cell}</strong></td>
+      <td style="color:${score.status_score>0?'var(--compliant)':'var(--breach)'}">${score.status_score.toFixed(2)}</td>
+      <td style="color:${score.actual_score>0?'var(--compliant)':'var(--breach)'}">${score.actual_score.toFixed(2)}</td>
+      <td style="color:${score.evidence_score>0?'var(--compliant)':'var(--breach)'}">${score.evidence_score.toFixed(2)}</td>
+      <td style="color:${color};font-weight:700">${score.total.toFixed(2)}</td>
+      <td style="font-size:10px;color:var(--text-dim)">${score.details||'—'}</td></tr>`;
+  }
+  if(!has) html+=`<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--text-dim)">Нет данных — запусти агента</td></tr>`;
+  html+='</tbody></table></div>';
+  document.getElementById('evalResults').innerHTML=html;
+}
+async function clearCache(){if(!confirm('Очистить кэш?'))return;await fetch('/api/clear-cache',{method:'POST'});showToast('Кэш очищен 🗑️');}
+let hitlActive=false;
+function pollStatus(){
+  const interval=setInterval(async()=>{
+    const r=await fetch('/api/status');const data=await r.json();updateStatus(data);await refreshAnswers();
+    const h=await fetch('/api/hitl/pending');const hitl=await h.json();
+    if(hitl.pending && !hitlActive){hitlActive=true;document.getElementById('hitlModal').style.display='flex';document.getElementById('hitlQuestion').innerHTML=`<strong>Транзакция:</strong> ${hitl.transaction_id}<br><br>${hitl.question}`;}
+    if(data.state!=='running'){clearInterval(interval);isAgentRunning=false;hitlActive=false;document.getElementById('hitlModal').style.display='none';
+      document.getElementById('btnRunAll').disabled=false;document.getElementById('btnRunP1').disabled=false;const ic=document.getElementById('runAllIcon');ic.className='';ic.textContent='▶';
+      if(data.state==='done'){await evaluate();showToast('✅ Анализ завершён');document.querySelector('[data-tab="results"]').click();}
+    }
+  },2200);
+}
+async function resolveHitl(){
+  const decision=document.getElementById('hitlInput').value;if(!decision) return showToast('Введи ответ!','error');
+  await fetch('/api/hitl/resolve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision})});
+  document.getElementById('hitlInput').value='';document.getElementById('hitlModal').style.display='none';hitlActive=false;showToast('Ответ отправлен');
+}
+let currentChatSid=null,currentChatCid=null;
+function openChatModal(sid,cid){
+  currentChatSid=sid;currentChatCid=cid;
+  document.getElementById('chatScenarioId').textContent=sid;document.getElementById('chatCovenantId').textContent=cid;
+  document.getElementById('chatHistory').innerHTML='<div style="color:var(--text-dim);text-align:center;margin-top:90px">Задай вопрос — объясню расчёт.</div>';
+  document.getElementById('chatInput').value='';document.getElementById('chatModal').style.display='flex';setTimeout(()=>document.getElementById('chatInput').focus(),90);
+}
+async function sendChatMessage(){
+  const inputEl=document.getElementById('chatInput'),btnEl=document.getElementById('btnSendChat'),historyEl=document.getElementById('chatHistory');
+  const message=inputEl.value.trim();if(!message) return;
+  if(historyEl.innerHTML.includes('Задай вопрос')) historyEl.innerHTML='';
+  historyEl.innerHTML+=`<div style="align-self:flex-end;background:var(--surface2);border:1px solid var(--border);padding:9px 12px;border-radius:12px 12px 0 12px;max-width:85%"><b>Вы:</b><br>${escapeHtml(message)}</div>`;
+  inputEl.value='';historyEl.scrollTop=historyEl.scrollHeight;inputEl.disabled=true;btnEl.disabled=true;btnEl.innerHTML='<span class="loading-spinner"></span>';
+  try{
+    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenario_id:currentChatSid,covenant_id:currentChatCid,message})});
+    const data=await res.json();
+    if(data.error) historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--breach-dim);padding:9px 12px;border-radius:12px 12px 12px 0;max-width:85%;color:var(--breach)"><b>Ошибка:</b><br>${escapeHtml(data.error)}</div>`;
+    else historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--accent-dim);padding:9px 12px;border-radius:12px 12px 12px 0;max-width:85%;border:1px solid #1DB95433"><b>🤖 Агент:</b><br>${data.reply.replace(/\n/g,'<br>')}</div>`;
+  }catch(e){historyEl.innerHTML+=`<div style="align-self:flex-start;background:var(--breach-dim);padding:9px 12px;border-radius:12px">Ошибка сети: ${e.message}</div>`;}
+  finally{inputEl.disabled=false;btnEl.disabled=false;btnEl.innerHTML='Отправить';historyEl.scrollTop=historyEl.scrollHeight;setTimeout(()=>inputEl.focus(),80);}
+}
+async function openEditModal(sid,cid){
+  const r=await fetch('/api/answers');const answers=await r.json();const cell=answers[sid]?.[cid];if(!cell) return;
+  document.getElementById('editScenarioId').textContent=sid;document.getElementById('editCovenantId').textContent=cid;
+  document.getElementById('editStatus').value=cell.status;document.getElementById('editActual').value=cell.actual;document.getElementById('editReasoning').value=cell.reasoning||'';
+  const evContainer=document.getElementById('evidenceContainer'),evContent=document.getElementById('evidenceContent');
+  if(cell.evidence_txn_id){evContainer.style.display='block';evContent.innerHTML=`Транзакция <strong>${cell.evidence_txn_id}</strong> — загрузка…`;
+    try{const txR=await fetch(`/api/transaction/${sid}/${cell.evidence_txn_id}`);if(txR.ok){const tx=await txR.json();evContent.innerHTML=`<strong>ID:</strong> ${tx.txn_id} · <strong>Дата:</strong> ${tx.date}<br><strong>Сумма:</strong> ${tx.amount} ${tx.currency}<br><strong>Контрагент:</strong> ${escapeHtml(tx.counterparty||'—')}<br><strong>Назначение:</strong> ${escapeHtml(tx.description||'—')}`;}else evContent.innerHTML=`Не найдена ${cell.evidence_txn_id}`;}catch(e){evContent.innerHTML='Ошибка загрузки';}
+  } else evContainer.style.display='none';
+  document.getElementById('editModal').style.display='flex';
+}
+async function saveEdit(){
+  const sid=document.getElementById('editScenarioId').textContent,cid=document.getElementById('editCovenantId').textContent;
+  const status=document.getElementById('editStatus').value,actual=parseFloat(document.getElementById('editActual').value),reasoning=document.getElementById('editReasoning').value;
+  const r=await fetch('/api/edit_answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenario_id:sid,covenant_id:cid,status,actual,reasoning})});
+  if(r.ok){document.getElementById('editModal').style.display='none';showToast('Сохранено ✅');await refreshAnswers();await evaluate();}else showToast('Ошибка сохранения','error');
+}
+function updateStatus(data){
+  const badge=document.getElementById('statusBadge');badge.textContent=(data.state||'idle').toUpperCase();badge.className='status-badge status-'+(data.state||'idle');
+  const total=data.total||0,progress=data.progress||0;
+  const pct=total>0?Math.round(progress/total*100):(data.state==='done'?100:0);
+  document.getElementById('progressFill').style.width=(data.state==='done'?100:pct)+'%';
+  document.getElementById('progressText').textContent=
+    data.state==='running'?`Анализ: ${data.current_scenario||'…'} (${progress}/${total})`:
+    data.state==='done'?'Завершено ✅ — открой вкладку «Результаты»':
+    data.state==='error'?`Ошибка: ${data.error}`:'Система готова к запуску';
+}
+async function uploadDataset(file){
+  if(!file) return;const btn=document.getElementById('btnUpload'),icon=document.getElementById('uploadIcon');icon.className='loading-spinner';icon.textContent='';btn.disabled=true;
+  showToast('Загрузка датасета…','success');const fd=new FormData();fd.append('file',file);
+  try{const r=await fetch('/api/upload',{method:'POST',body:fd});const data=await r.json();if(data.ok){showToast('Датасет загружен — запускаем анализ');runAgent();}else showToast('Ошибка: '+data.error,'error');}catch(e){showToast('Ошибка сети','error');}
+  finally{icon.className='';icon.textContent='📁';btn.disabled=false;document.getElementById('datasetUpload').value='';}
+}
+function formatCurrency(val){if(val==null||val==='null'||val==='') return '—';return '$'+Number(val).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function formatRatio(val){if(val==null||val==='null'||val==='') return '—';return Number(val).toFixed(2)+'x';}
+function escapeHtml(text){const m={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};return String(text).replace(/[&<>"']/g,k=>m[k]);}
+function renderAnswers(answers){
+  const tbody=document.getElementById('answersBody');let html='',filled=0,breach=0,compliant=0;
+  for(const sid of SCENARIOS){
+    if(!answers[sid]) continue;
+    let hasData=false,detailsId=`details-${sid}`;
+    let rowHtml=`<tr style="cursor:pointer" onclick="const d=document.getElementById('${detailsId}');if(d)d.style.display=d.style.display==='none'?'table-row':'none'">
+      <td><span style="background:var(--surface3);padding:3px 7px;border-radius:6px;font-size:10px">▼</span> <strong style="color:var(--accent);font-size:13px">${sid}</strong></td>`;
+    let comments=[];
+    for(const cid of ['6.1','6.2','6.3']){
+      const cell=answers[sid]?.[cid];
+      if(cell && cell.status){hasData=true;filled++;if(cell.status==='BREACH') breach++;else compliant++;
+        const tag=cell.status==='BREACH'?'tag-breach':'tag-compliant';
+        rowHtml+=`<td><span class="${tag}">${cell.status}</span></td>`;
+        let actualVal=cid==='6.1'&&Number(cell.actual)<10?formatRatio(cell.actual):formatCurrency(cell.actual);
+        // auto-detect ratio vs sum: if actual < 5 and not big sum, treat as ratio
+        if(cell.actual!=null && Number(cell.actual)<20 && String(cid)==='6.1') {/* keep ratio */}
+        rowHtml+=`<td>${actualVal}</td>`;
+        rowHtml+=`<td style="font-size:10px;color:var(--text-dim);max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${cell.evidence_txn_id||'—'}">${cell.evidence_txn_id||'—'}</td>`;
+        if(cell.reasoning){
+          let comment=`<div style="background:var(--surface2);padding:12px;border-radius:10px;margin-bottom:8px;border-left:3px solid var(${cell.status==='BREACH'?'--breach':'--compliant'});position:relative">`;
+          comment+=`<button class="btn-secondary btn-small" onclick="event.stopPropagation();openEditModal('${sid}','${cid}')" style="position:absolute;right:12px;top:12px">✏️</button>`;
+          comment+=`<button class="btn-secondary btn-small" onclick="event.stopPropagation();openChatModal('${sid}','${cid}')" style="position:absolute;right:62px;top:12px">💬</button>`;
+          comment+=`<strong>Ковенант ${cid}</strong> <span class="${tag}" style="font-size:10px;margin-left:6px">${cell.status}</span><br>`;
+          let fR=cell.reasoning.replace(/\n•/g,'<br>•').replace(/\n-/g,'<br>—');
+          comment+=`<div style="margin-top:8px;font-size:12px;line-height:1.6;color:#D0D4E0">${fR}</div>`;
+          if(cell.graph_mermaid){
+            const mId=`mermaid-${sid}-${cid.replace('.','')}`;
+            comment+=`<div style="margin-top:10px"><button class="btn-secondary btn-small" onclick="event.stopPropagation();toggleMermaid(this,'${mId}')">Показать граф</button></div>`;
+            comment+=`<div id="${mId}-code" style="display:none">${escapeHtml(cell.graph_mermaid)}</div>`;
+            comment+=`<div id="${mId}" style="display:none;margin-top:10px;background:#080C0B;padding:14px;border-radius:10px;overflow:auto"></div>`;
+          }
+          comment+=`</div>`;comments.push(comment);
+        }
+      } else rowHtml+='<td class="tag-empty">—</td><td class="tag-empty">—</td><td class="tag-empty">—</td>';
+    }
+    rowHtml+='</tr>';
+    if(hasData){html+=rowHtml;
+      if(comments.length){let hasBreach=comments.some(c=>c.includes('tag-breach'));let display=hasBreach?'table-row':'none';
+        html+=`<tr id="${detailsId}" style="display:${display}"><td colspan="10" style="padding:16px 18px;background:var(--bg);border-bottom:1px solid var(--border)"><div style="color:var(--text-dim);font-weight:700;margin-bottom:8px;font-size:11px;letter-spacing:.06em">Бизнес-выводы по ${sid}</div>${comments.join('')}</td></tr>`;
+      }
+    }
+  }
+  if(!html) html=`<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--text-dim)">Нет данных — запусти агента. После завершения здесь появятся 36 ячеек с reasoning.</td></tr>`;
+  tbody.innerHTML=html;
+  document.getElementById('statFilled').textContent=filled;
+  document.getElementById('statBreach').textContent=breach;
+  document.getElementById('statCompliant').textContent=compliant;
+}
+async function toggleMermaid(btn,id){
+  const div=document.getElementById(id),code=document.getElementById(id+'-code').textContent;
+  if(div.style.display==='none'){div.style.display='block';btn.textContent='Скрыть граф';
+    if(!div.hasAttribute('data-rendered')){try{const {svg}=await mermaid.render('svg-'+id,code);div.innerHTML=svg;div.setAttribute('data-rendered','true');}catch(e){div.innerHTML='<div style="color:var(--breach)">Ошибка Mermaid: '+e.message+'</div>';}}
+  } else {div.style.display='none';btn.textContent='Показать граф';}
+}
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(ov=>ov.addEventListener('click',e=>{if(e.target===ov) ov.style.display='none';}));
+// Initial load
+refreshAll();evaluate();loadMetrics();loadProviders();
+setInterval(refreshStatus,4000);
+</script>
 </body>
 </html>

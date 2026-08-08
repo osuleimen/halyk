@@ -27,13 +27,13 @@ PROVIDERS_PATH = os.path.join(CACHE_DIR, "providers.json")
 DEFAULT_PROVIDERS = {
     "gemini": {
         "name": "Google Gemini",
-        "type": "gemini",              # native google-genai
+        "type": "gemini",              # native google-genai — fallback only
         "api_key": "",
         "models": {
             "fast": "gemini-2.5-flash",
             "pro": "gemini-2.5-pro",
         },
-        "enabled": True,
+        "enabled": False,
     },
     "deepseek": {
         "name": "DeepSeek",
@@ -120,6 +120,27 @@ def get_active_provider() -> tuple[str, dict]:
         if cfg.get("enabled") and cfg.get("api_key"):
             return pid, cfg
     raise ValueError("No active provider configured! Add an API key in the admin panel.")
+
+
+def get_vision_provider() -> tuple[str, dict] | None:
+    """Best provider for PDF Vision (native PDF input). Prefers Gemini even if disabled."""
+    providers = load_providers()
+    # Prefer Gemini with a key, even if not enabled (fallback for Vision only)
+    gem = providers.get("gemini")
+    if gem and gem.get("api_key"):
+        return "gemini", gem
+    # Otherwise try active provider if it supports vision
+    try:
+        pid, cfg = get_active_provider()
+        if cfg.get("type") == "gemini":
+            return pid, cfg
+    except Exception:
+        pass
+    return None
+
+
+# Scenarios that historically need extra verification / Vision re-extraction
+PROBLEMATIC_SCENARIOS = ["P3", "P4", "P5", "P6", "P9"]  # from honest 85.56% run
 
 
 # === Borrower mapping ===

@@ -98,9 +98,28 @@ def create_vision_llm(provider_id: str, provider_config: dict):
     if provider_config.get("type") == "gemini":
         from google import genai
         api_key = _clean_api_key(provider_config["api_key"])
+        if not api_key:
+            return None
         client = genai.Client(api_key=api_key)
         return client
     return None
+
+
+def get_vision_client():
+    """Resolve best Vision client using config.get_vision_provider (Gemini fallback)."""
+    try:
+        import sys, os
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+        from config import get_vision_provider
+        vp = get_vision_provider()
+        if vp is None:
+            return None, None, None
+        pid, cfg = vp
+        client = create_vision_llm(pid, cfg)
+        return client, pid, cfg
+    except Exception as e:
+        logger.warning("Vision client resolve failed: %s", e)
+        return None, None, None
 
 
 def test_provider(provider_id: str, provider_config: dict) -> dict:
