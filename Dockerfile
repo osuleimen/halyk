@@ -32,10 +32,11 @@ COPY --from=builder /wheels /wheels
 RUN pip install --no-cache /wheels/* && rm -rf /wheels
 
 COPY --chown=halyk:halyk . .
-
-RUN mkdir -p /app/cache && chown -R halyk:halyk /app/cache /app
+COPY deploy/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && mkdir -p /app/cache && chown -R halyk:halyk /app/cache /app
 
 USER halyk
+ENTRYPOINT ["/entrypoint.sh"]
 
 EXPOSE 8000
 

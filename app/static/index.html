@@ -363,6 +363,17 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
           </div>
         </div>
       </div>
+      <div style="margin-top:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--text-dim)">Сейчас:</span><span id="liveAction" class="small" style="color:var(--text);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">ожидание</span>
+        <span id="liveSpinner" style="display:none;margin-left:auto" class="loading-spinner"></span>
+      </div>
+      <div style="margin-top:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span class="small muted" style="font-weight:700;letter-spacing:.06em;text-transform:uppercase">Логи агента (live)</span>
+          <button class="btn btn-ghost" style="padding:3px 7px;font-size:10px" onclick="document.getElementById('liveLog').textContent='';appendSystem('Логи очищены')">очистить</button>
+        </div>
+        <div id="liveLog" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-family:var(--mono);font-size:10px;line-height:1.5;color:var(--text-dim);height:140px;overflow:auto;white-space:pre-wrap;word-break:break-word">жду запуска…</div>
+      </div>
     </div>
 
     <!-- Data + Score -->
@@ -411,7 +422,8 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
         <div class="format-item"><div class="format-icon">🔗</div><div><h4>Подтверждение доказательствами</h4><p><code>evidence_txn_id</code> — если указана, точный txn; если null — следует шкале actual</p></div></div>
       </div>
     </div>
-
+    </div>
+    <div class="atab-panel" id="atab-results">
     <!-- Results -->
     <div class="card" id="resultsCard">
       <div class="card-head">
@@ -429,7 +441,8 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
         <div id="reasoningContent" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;line-height:1.6;color:var(--text-dim);white-space:pre-wrap"></div>
       </div>
     </div>
-
+    </div>
+    <div class="atab-panel" id="atab-format">
     <!-- Format & Deliverables -->
     <div class="card">
       <div class="card-title"><span class="dot" style="background:var(--compliant)"></span> Формат ответа</div>
@@ -467,7 +480,8 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
         <div class="deliverable"><span>📖</span><div><b>3. README</b><div class="small muted">Как запустить • <code>docker compose up</code></div></div></div>
       </div>
     </div>
-
+    </div>
+    </div>
     <div class="small muted" style="text-align:center;padding:8px 0 4px">Halyk Bank • halyk.wit.kz • muse-spark + Gemini Vision • <a href="/health" target="_blank">health</a> • <a href="/metrics" target="_blank">metrics</a></div>
   </div>
 </aside>
@@ -565,16 +579,22 @@ function setPipelineStep(n, state){
 }
 function updatePipelineFromStatus(s){
   const state=s.state;
+  const la=document.getElementById('liveAction');
+  const spin=document.getElementById('liveSpinner');
   if(state==='idle'){
     for(let i=1;i<=6;i++) setPipelineStep(i,'idle');
     document.getElementById('workflowStatus').textContent='ожидание';
     document.getElementById('progressBar').style.width='0%';
     document.getElementById('statusPill').className='status-pill status-idle';
     document.getElementById('statusPill').textContent='IDLE';
+    if(la) la.textContent='ожидание • нажми Запустить';
+    if(spin) spin.style.display='none';
   } else if(state==='running'){
     document.getElementById('workflowStatus').textContent='выполнение • '+ (s.current_scenario||'…') + ` (${s.progress||0}/${s.total||12})`;
     document.getElementById('statusPill').className='status-pill status-running';
     document.getElementById('statusPill').textContent='RUNNING';
+    if(la) la.textContent=`${s.current_scenario||'подготовка'} • ${s.progress||0}/${s.total||12} • ${s.executor||''}`;
+    if(spin) spin.style.display='inline-block';
     // steps 1-2 done fast, 3-5 running based on progress
     setPipelineStep(1,'done');
     setPipelineStep(2,'done');
@@ -596,10 +616,14 @@ function updatePipelineFromStatus(s){
     document.getElementById('progressBar').style.width='100%';
     document.getElementById('statusPill').className='status-pill status-done';
     document.getElementById('statusPill').textContent='DONE';
+    if(la) la.textContent='завершено • '+ (s.progress||12)+'/'+(s.total||12);
+    if(spin) spin.style.display='none';
   } else if(state==='error'){
     document.getElementById('workflowStatus').textContent='ошибка: '+(s.error||'');
     document.getElementById('statusPill').className='status-pill status-error';
     document.getElementById('statusPill').textContent='ERROR';
+    if(la) la.textContent='ошибка: '+(s.error||'неизвестно').slice(0,80);
+    if(spin) spin.style.display='none';
   }
 }
 function updatePipelineFromLog(msg){
@@ -979,7 +1003,7 @@ document.getElementById('chatInput').addEventListener('input',e=>{
   e.target.style.height=Math.min(e.target.scrollHeight,120)+'px';
 });
 
-// WebSocket
+// WebSocket + live понимание
 function connectWS(){
   const proto=location.protocol==='https:'?'wss':'ws';
   try{
@@ -987,8 +1011,21 @@ function connectWS(){
     ws.onmessage=e=>{
       const msg=e.data;
       updatePipelineFromLog(msg);
-      // stream as collapsible system log, not spam chat
-      // show only important logs in chat
+      // liveAction всегда
+      const la=document.getElementById('liveAction');
+      if(la) la.textContent=msg.slice(0,120);
+      const spin=document.getElementById('liveSpinner');
+      if(spin) spin.style.display = msg.includes('…')||msg.includes('Running')||msg.includes('Extract')||msg.includes('Analyzing') ? 'inline-block' : 'none';
+      // liveLog — полный поток без фильтра
+      const ll=document.getElementById('liveLog');
+      if(ll){
+        if(ll.textContent==='жду запуска…') ll.textContent='';
+        ll.textContent += msg + '\n';
+        ll.scrollTop = ll.scrollHeight;
+        // держим последние 300 строк
+        const lines=ll.textContent.split('\n');
+        if(lines.length>300){ ll.textContent=lines.slice(-300).join('\n'); }
+      }
       if(msg.includes('✅')||msg.includes('📂')||msg.includes('Scenario')||msg.includes('finished')||msg.includes('Error')||msg.includes('BREACH')||msg.includes('COMPLIANT')){
         appendSystem(msg);
       }
@@ -1096,6 +1133,20 @@ document.getElementById('settingsModal').addEventListener('click',e=>{ if(e.targ
   sep.addEventListener('dblclick',()=>{
     artifacts.style.width='420px'; localStorage.removeItem('artifacts_width');
   });
+})();
+
+// Artifact tabs
+function switchAtab(name){
+  document.querySelectorAll('.atab').forEach(b=>b.classList.toggle('active', b.dataset.atab===name));
+  document.querySelectorAll('.atab-panel').forEach(p=>p.classList.toggle('active', p.id==='atab-'+name));
+  localStorage.setItem('atab', name);
+  // скролл артефактов наверх при переключении
+  const sc=document.getElementById('artifactsScroll');
+  if(sc) sc.scrollTop=0;
+}
+(function(){
+  const saved=localStorage.getItem('atab');
+  if(saved && document.getElementById('atab-'+saved)) switchAtab(saved);
 })();
 
 // Refresh

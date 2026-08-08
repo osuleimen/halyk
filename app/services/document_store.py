@@ -225,8 +225,11 @@ def extract_all(use_cache: bool = True, progress_callback=None) -> dict[str, str
                             if progress_callback:
                                 progress_callback(0, 0, fn, "vision-upgrade")
                             time.sleep(1.5)
-                with open(EXTRACT_CACHE_PATH, "w", encoding="utf-8") as f:
-                    json.dump(cached, f, ensure_ascii=False)
+                try:
+                    with open(EXTRACT_CACHE_PATH, "w", encoding="utf-8") as f:
+                        json.dump(cached, f, ensure_ascii=False)
+                except PermissionError as e:
+                    logger.warning(f"Cache write Permission denied {EXTRACT_CACHE_PATH}: {e} — continue in memory")
         return cached
 
     results = {}
@@ -259,11 +262,17 @@ def extract_all(use_cache: bool = True, progress_callback=None) -> dict[str, str
             logger.info("[%d/%d] %s (%s, %d chars)", i + 1, total, fname, method, len(text))
 
         if (i + 1) % 20 == 0:
-            with open(EXTRACT_CACHE_PATH, "w", encoding="utf-8") as f:
-                json.dump(results, f, ensure_ascii=False)
+            try:
+                with open(EXTRACT_CACHE_PATH, "w", encoding="utf-8") as f:
+                    json.dump(results, f, ensure_ascii=False)
+            except PermissionError as e:
+                logger.warning(f"Periodic cache write failed: {e}")
 
-    with open(EXTRACT_CACHE_PATH, "w", encoding="utf-8") as f:
-        json.dump(results, f, ensure_ascii=False)
+    try:
+        with open(EXTRACT_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False)
+    except PermissionError as e:
+        logger.warning(f"Final cache write Permission denied: {e} — continue without cache file")
     logger.info("Extraction done: %d docs (%d via vision)", total, vision_count)
     return results
 
@@ -398,11 +407,17 @@ def build_index(texts: dict[str, str], use_cache: bool = True, progress_callback
             time.sleep(0.3)
 
         if (i + 1) % 20 == 0:
-            with open(INDEX_CACHE_PATH, "w", encoding="utf-8") as f:
-                json.dump(index, f, ensure_ascii=False)
+            try:
+                with open(INDEX_CACHE_PATH, "w", encoding="utf-8") as f:
+                    json.dump(index, f, ensure_ascii=False)
+            except PermissionError as e:
+                logger.warning(f"Index periodic write failed: {e}")
 
-    with open(INDEX_CACHE_PATH, "w", encoding="utf-8") as f:
-        json.dump(index, f, ensure_ascii=False)
+    try:
+        with open(INDEX_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(index, f, ensure_ascii=False)
+    except PermissionError as e:
+        logger.warning(f"Index final write Permission denied: {e} — continue in memory")
     logger.info("Indexing done: %d documents", total)
     return index
 
