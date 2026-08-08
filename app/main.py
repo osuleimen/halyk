@@ -29,6 +29,24 @@ from app.services.llm_factory import test_provider
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
 logger = logging.getLogger(__name__)
 
+def _content_str(c) -> str:
+    """LLM content может быть str или list[dict/str] (muse-spark) — приводим к str."""
+    if c is None:
+        return ""
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        parts = []
+        for x in c:
+            if isinstance(x, str):
+                parts.append(x)
+            elif isinstance(x, dict):
+                parts.append(x.get("text") or x.get("content") or str(x))
+            else:
+                parts.append(getattr(x, "text", None) or str(x))
+        return "".join(parts)
+    return str(c)
+
 # ── Security: rate limit + optional admin token (не ломает демо, но режет ботов) ──
 def _get_client_ip(request: Request) -> str:
     # за Caddy/X-Forwarded-For — берём реальный IP, иначе все боты с одного IP Caddy
@@ -556,7 +574,7 @@ async def api_chat(req: ChatRequest, request: Request):
     try:
         from langchain_core.messages import HumanMessage
         response = llm.invoke([HumanMessage(content=prompt)])
-        return {"reply": response.content}
+        return {"reply": _content_str(response.content)}
     except Exception as e:
         return JSONResponse({"error": f"Ошибка LLM: {str(e)}"}, status_code=500)
 
@@ -601,7 +619,7 @@ async def api_global_chat(req: GlobalChatRequest, request: Request):
     try:
         from langchain_core.messages import HumanMessage
         response = llm.invoke([HumanMessage(content=prompt)])
-        content = response.content
+        content = _content_str(response.content)
         
         # Parse actions
         import re

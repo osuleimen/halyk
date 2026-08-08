@@ -147,7 +147,10 @@ def test_provider(provider_id: str, provider_config: dict) -> dict:
         
         llm = create_llm(provider_id, cfg_copy, tier="fast", max_tokens=50)
         response = llm.invoke("Say 'OK' in one word")
-        content = response.content[:100] if response.content else "empty response"
+        raw = response.content if hasattr(response, "content") else response
+        if isinstance(raw, list):
+            raw = "".join([x if isinstance(x, str) else x.get("text","") if isinstance(x, dict) else str(getattr(x,"text",x)) for x in raw])
+        content = (raw[:100] if raw else "empty response")
         return {"ok": True, "message": f"✅ Работает! Ответ: {content}"}
     except Exception as e:
         err = str(e)
