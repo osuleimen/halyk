@@ -1,6 +1,7 @@
-# === Halyk — аккуратно добавить в существующий /opt/onaiu/Caddyfile или /opt/halyk/Caddyfile ===
+# === Halyk — аккуратно добавить в существующий /opt/onaiu/Caddyfile или /opt/dev/Caddyfile ===
 # Не затирать весь Caddyfile onaiu — просто вставить этот блок в конец файла.
 # Caddy сам получит TLS для halyk.wit.kz через тот же ACME (CADDY_EMAIL), on-demand не нужен.
+# Если halyk-covenant-agent не резолвится (502 no such host) — сеть не совпала, см. docker-compose.yml ONAIU_NETWORK.
 
 halyk.wit.kz {
         # логи отдельно — не мешают onaiu
@@ -8,18 +9,18 @@ halyk.wit.kz {
         #       output file /var/log/caddy/halyk.wit.kz.log
         # }
 
-        # прокси на halyk-covenant-agent внутри docker сети onaiu_network
-        # (halyk контейнер должен быть в onaiu_network — см. docker-compose.yml)
+        # Основное — по внутренней docker сети (если halyk в onaiu_network)
         reverse_proxy halyk-covenant-agent:8000 {
                 header_up Host {host}
                 header_up X-Real-IP {remote}
                 header_up X-Forwarded-For {remote}
                 header_up X-Forwarded-Proto {scheme}
-
-                # для WebSocket логов агента
                 header_up Upgrade {http.request.header.Upgrade}
                 header_up Connection {http.request.header.Connection}
         }
+        # Fallback: если halyk не в onaiu_network — Caddy пойдёт на хост-порт 18080
+        # раскомментируй на cloud-001 если видишь "lookup halyk-covenant-agent no such host":
+        # reverse_proxy 172.17.0.1:18080  # или host.docker.internal:18080
 
         # кешируем статику, но не HTML (UI всегда свежий)
         @static {

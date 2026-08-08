@@ -47,14 +47,32 @@ if [[ -n "$SRC" && -f "$SRC" ]]; then
 fi
 
 echo ""
-echo "[3] Валидация ВНУТРИ контейнера (правильный путь /etc/caddy/Caddyfile)..."
+echo "[3] Проверка сети halyk ↔ onaiu_caddy (причина 502 no such host)..."
+docker network ls | grep -E "onaiu|halyk" | sed 's/^/    /'
+echo "  onaiu_caddy networks:"
+docker inspect onaiu_caddy --format '{{json .NetworkSettings.Networks}}' 2>/dev/null | python3 -m json.tool 2>/dev/null | sed 's/^/    /' || docker inspect onaiu_caddy --format '{{.NetworkSettings.Networks}}' | sed 's/^/    /'
+echo "  halyk networks:"
+docker inspect halyk-covenant-agent --format '{{json .NetworkSettings.Networks}}' 2>/dev/null | python3 -m json.tool 2>/dev/null | sed 's/^/    /' || echo "    (halyk ещё не запущен)"
+if docker exec onaiu_caddy getent hosts halyk-covenant-agent >/dev/null 2>&1; then
+  echo "  ✅ halyk-covenant-agent резолвится внутри onaiu_caddy"
+else
+  echo "  ❌ halyk-covenant-agent НЕ резолвится — сети не совпали!"
+  echo "     Фикс: ONAIU_NETWORK=\$(docker inspect onaiu_caddy --format '{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}} {{end}}' | tr ' ' '\n' | grep onaiu | head -n1)"
+  echo "           ONAIU_NETWORK=dev_onaiu_network docker compose up -d"
+  echo "     Или горячий фикс без ребута onaiu:"
+  echo "           docker network connect \$(docker inspect onaiu_caddy --format '{{range \$k,\$v := .NetworkSettings.Networks}}{{\$k}} {{end}}' | awk '{print \$1}') halyk-covenant-agent"
+fi
+
+echo ""
+echo "[4] Валидация ВНУТРИ контейнера (правильный путь /etc/caddy/Caddyfile)..."
 docker exec onaiu_caddy caddy validate --config /etc/caddy/Caddyfile && echo "  ✅ validate OK" || echo "  ❌ validate FAILED — смотри лог выше"
 
 echo ""
-echo "[4] Если validate OK — reload:"
+echo "[5] Если validate OK — reload:"
 echo "  docker exec onaiu_caddy caddy reload --config /etc/caddy/Caddyfile"
 echo "  docker logs onaiu_caddy --tail 30 | grep -i halyk"
-echo "  curl -s https://halyk.wit.kz/api/status | jq ."
+echo "  curl -s https://halyk.wit.kz/api/status | jq .  # должен быть 200, не 502"
+echo "  curl -s https://halyk.wit.kz/secrets.json -i  # 502 был из-за DNS, после фикса — 404/200 как у агента"
 
 echo ""
 echo "Подсказка: НЕ запускай 'caddy validate --config /opt/dev/Caddyfile' внутри контейнера — внутри всегда /etc/caddy/Caddyfile"

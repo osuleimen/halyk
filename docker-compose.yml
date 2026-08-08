@@ -100,8 +100,10 @@ networks:
     driver: bridge
   onaiu_network:
     external: true
-    # если сети нет (первый раз) — создаст halyk-net, а onaiu_network уже создана onaiu стеком
-    # если нужно создать вручную: docker network create onaiu_network
+    # на cloud-001 реальное имя может быть dev_onaiu_network или onaiu_onaiu_network
+    # если up падает "network onaiu_network declared as external, but could not be found"
+    # задай правильное имя через .env: ONAIU_NETWORK=dev_onaiu_network
+    name: ${ONAIU_NETWORK:-onaiu_network}
 
 volumes:
   halyk_cache:
