@@ -579,9 +579,10 @@ async def api_reset(request: Request):
 
 @app.post("/api/reset_all")
 async def api_reset_all(request: Request):
-    """Общий ресет: чистит кэш документов и статус, но НЕ трогает submission.json по умолчанию (чтобы результат не исчезал)."""
+    """Общий ресет: полная очистка перед запуском — кэш, логи, статус и submission. Управляется полностью через веб."""
     global agent_status, agent_answers, agent_logs
-    hard = request.query_params.get("hard") == "1"
+    # по умолчанию hard=1 для хакатона — полная очистка, ?hard=0 чтобы сохранить submission
+    hard = request.query_params.get("hard") != "0"
     _load_status_file()
     agent_status = {"state": "idle", "current_scenario": None, "progress": 0, "total": len(SCENARIOS), "started_at": None, "error": None}
     agent_answers.clear()
@@ -609,10 +610,11 @@ async def api_reset_all(request: Request):
             import shutil
             if os.path.exists(TEMPLATE_PATH):
                 shutil.copy(TEMPLATE_PATH, OUTPUT_PATH)
+            broadcast_log("🧹 Полный сброс: кэш, логи, статус и submission очищены — готов к загрузке датасета")
         except Exception as e:
             logger.warning(f"reset_all hard copy failed: {e}")
     else:
-        broadcast_log("🧹 Сброс: кэш и статус очищены, submission.json сохранён. Для полной очистки добавь ?hard=1")
+        broadcast_log("🧹 Сброс: кэш и статус очищены, submission.json сохранён")
     # чистим вложенные дубликаты agentic-bank-public/agentic-bank-public если есть
     try:
         import pathlib
@@ -1042,8 +1044,11 @@ async def api_global_chat(req: GlobalChatRequest, request: Request):
 Вы - Halyk AI, Главный ИИ-Копилот дашборда Halyk AI Challenge.
 Ваша задача - помогать менеджеру управлять системой анализа ковенантов.
 Доступные провайдеры LLM: {', '.join(providers.keys())}.
-Текущий провайдер: {active_pid}.
+Текущий провайдер: {active_pid} (основной для ReAct).
+Vision: Gemini Vision (gemini-3.5-flash-lite → flash) подключается АВТОМАТИЧЕСКИ как fallback, если PyMuPDF извлек <1200 симв. или нет цифр/таблиц. Ручное переключение не нужно — система сама решает.
 Состояние агента: {agent_status['state']}
+
+Отвечай на русском, без слова "Прото". Если спрашивают "использовал ли Vision для P6?" — отвечай честно: для P6 Vision не нужен был (документы текстовые, PyMuPDF хватило), для сканов P3/P5/P9 Vision включается автоматом.
 
 Если пользователь просит:
 1. ЗАПУСТИТЬ анализ конкретных сценариев (или всех): вы ДОЛЖНЫ включить в свой ответ точный тег [ACTION: RUN <сценарии через запятую>] (например, [ACTION: RUN P1,P2] или [ACTION: RUN ALL]).
@@ -1103,6 +1108,30 @@ async def api_global_chat(req: GlobalChatRequest, request: Request):
         for pid in providers.keys():
             if pid.lower() in low and ("смен" in low or "model" in low or "модел" in low):
                 return f"SET_MODEL {pid}", f"Переключаю на {pid}..."
+        # Объясни — без LLM отдаем reasoning из кэша
+        if any(w in low for w in ["объясни", "что с", "почему", "покажи", "расскажи"]):
+            # найдем сценарий/ковенант в сообщении
+            import re as _re2
+            m = _re2.search(r'(P\d{1,2}|B1|B4)[\s\.\-]*6\.([123])', msg.upper())
+            if m:
+                sid, cid = m.group(1), "6."+m.group(2)
+                _load_answers_file()
+                cell = agent_answers.get(sid, {}).get(cid)
+                if cell and cell.get("reasoning"):
+                    return None, f"📋 {sid} {cid} — {cell.get('status')} • actual {cell.get('actual')} • evidence {cell.get('evidence_txn_id') or 'null'}\n\n{cell.get('reasoning')}"
+                elif cell:
+                    return None, f"{sid} {cid} — {cell.get('status')} actual {cell.get('actual')}"
+            # общий список нарушений
+            if "нарушен" in low or "покажи" in low:
+                _load_answers_file()
+                breaches=[]
+                for s,covs in agent_answers.items():
+                    for c,cell in covs.items():
+                        if cell.get("status")=="BREACH":
+                            breaches.append(f"{s}.{c} {cell.get('actual')} {cell.get('evidence_txn_id') or ''}")
+                if breaches:
+                    return None, "🔴 Нарушения:\n" + "\n".join(breaches)
+            return None, "Спроси `объясни P6.6.1` или `покажи нарушения` — отдам reasoning без LLM"
         return None, None
 
     try:
@@ -1142,8 +1171,15 @@ async def api_global_chat(req: GlobalChatRequest, request: Request):
         return {"reply": content}
     except Exception as e:
         # LLM упал (tuple index и т.д.) — пробуем fallback без LLM
-        logger.warning("Global chat LLM failed, fallback parsing: %s", e)
+        # для хакатона не показываем технический tuple, а отдаем понятный ответ
+        if "tuple" in str(e).lower() and "index" in str(e).lower():
+            logger.warning("LLM tuple error — отдаем fallback без LLM")
+        else:
+            logger.warning("Global chat LLM failed, fallback parsing: %s", e)
         fb_action, fb_reply = _fallback_action(req.message)
+        # если это был запрос на объяснение — отдаем reasoning без LLM даже без action
+        if fb_reply and not fb_action:
+            return {"reply": fb_reply}
         if fb_action:
             try:
                 if fb_action.startswith("RUN"):
@@ -1166,7 +1202,8 @@ async def api_global_chat(req: GlobalChatRequest, request: Request):
                         return {"reply": fb_reply + " ✅"}
             except Exception as fe:
                 logger.warning("Fallback also failed: %s", fe)
-        return JSONResponse({"error": f"Ошибка LLM: {str(e)} (попробуй 'запусти P6' ещё раз — fallback тоже пробовал)"}, status_code=500)
+        # не показываем технический tuple в UI — дружелюбно
+        return JSONResponse({"error": "LLM временно недоступен — попробуй `запусти P6` (fallback сработает) или `объясни P6.6.1` (из кэша без LLM)"}, status_code=500)
 
 
 # ═══ WebSocket ═══

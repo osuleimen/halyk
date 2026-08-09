@@ -6,6 +6,8 @@
 <title>Halyk Covenant Agent — halyk.wit.kz</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:false, theme:'dark', themeVariables:{primaryColor:'#1A252B', primaryTextColor:'#E6EEF2', lineColor:'#00C070', tertiaryColor:'#22333B'}})</script>
 <style>
 :root{
   --bg:#0B0F11;
@@ -276,9 +278,29 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
         <h3>Halyk Covenant Agent готов</h3>
         <p>Агент проходит 6 шагов: от архива с документами до обоснованного ответа с доказательствами. Загрузи ZIP или нажми «Запустить» — покажу каждый шаг в этом чате, а справа соберу артефакты.</p>
         <div class="empty-actions">
-          <button class="btn btn-primary" onclick="runAgent()">▶ Запустить все 12 сценариев</button>
-          <button class="btn btn-secondary" onclick="runAgent(['P1','P2','P3'])">Быстрый тест P1–P3</button>
-          <button class="btn btn-ghost" onclick="triggerUpload()">📁 Загрузить ZIP</button>
+          <button class="btn btn-primary" onclick="runAgent()">▶ Запустить все 12</button>
+          <button class="btn btn-secondary" onclick="runAgent(['P1','P2','P3'])">Тест P1–P3</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('scenarioPicker').style.display='flex'">Выбрать…</button>
+          <button class="btn btn-ghost" onclick="triggerUpload()">📁 ZIP</button>
+        </div>
+        <div id="scenarioPicker" style="display:none;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px">
+          <label style="font-size:11px;color:var(--text-dim);width:100%;text-align:center">Выбери сценарии и нажми Запустить:</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="P1" checked> P1</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="P2" checked> P2</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="P3" checked> P3</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="P4"> P4</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="P5"> P5</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="P6"> P6</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="P7"> P7</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="P8"> P8</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="P9"> P9</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="P10"> P10</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="B1"> B1</label>
+          <label class="hint-chip" style="cursor:pointer"><input type="checkbox" value="B4"> B4</label>
+          <div style="width:100%;display:flex;gap:6px;justify-content:center;margin-top:6px">
+            <button class="btn btn-primary" style="padding:6px 12px;font-size:11px" onclick="runSelected()">▶ Запустить выбранные</button>
+            <button class="btn btn-ghost" style="padding:6px 10px;font-size:11px" onclick="document.getElementById('scenarioPicker').style.display='none'">Закрыть</button>
+          </div>
         </div>
         <div style="margin-top:10px;font-size:11px;color:var(--text-faint)">Подсказки: «запусти P6» • «что с ковенантом 6.1 у P3?» • «покажи транзакцию TXN-P6-0040»</div>
       </div>
@@ -441,6 +463,14 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
       <div id="resultsReasoning" style="margin-top:10px;display:none">
         <div class="small muted" style="margin-bottom:6px;font-weight:700;letter-spacing:.04em;text-transform:uppercase">Комментарий агента</div>
         <div id="reasoningContent" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:12px;line-height:1.6;color:var(--text-dim);white-space:pre-wrap"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn btn-secondary" style="padding:4px 8px;font-size:11px" onclick="toggleGraph()">🕸 Показать граф связей</button>
+          <span class="small muted" style="align-self:center">Mermaid — как было красиво</span>
+        </div>
+        <div id="graphContainer" style="display:none;margin-top:8px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;overflow:auto">
+          <div id="graphCode" style="display:none;font-family:var(--mono);font-size:10px;white-space:pre-wrap"></div>
+          <div id="graphRender"></div>
+        </div>
       </div>
     </div>
     </div>
@@ -772,24 +802,52 @@ function renderResults(answers){
   if(!html) html=`<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--text-faint)">Нет данных — запусти агента</td></tr>`;
   tbody.innerHTML=html;
 }
+let currentGraphMermaid='';
 function showReasoning(sid){
   const row=answersCache[sid];
   if(!row) return;
   const box=document.getElementById('resultsReasoning');
   const content=document.getElementById('reasoningContent');
   let html='';
+  let graphs=[];
   for(const cid of ['6.1','6.2','6.3']){
     const cell=row[cid];
     if(!cell) continue;
     html+=`${sid} • ${cid} — ${cell.status} • actual: ${cell.actual} • evidence: ${cell.evidence_txn_id||'null'}\n`;
     html+=(cell.reasoning||'(нет reasoning)')+'\n';
     html+='—'.repeat(40)+'\n';
+    if(cell.graph_mermaid) graphs.push(`%% ${sid} ${cid}\n`+cell.graph_mermaid);
   }
   content.textContent=html;
   box.style.display='block';
+  currentGraphMermaid = graphs.join('\n\n');
+  document.getElementById('graphCode').textContent = currentGraphMermaid || '(нет графа для этого сценария)';
+  document.getElementById('graphRender').innerHTML = '';
+  document.getElementById('graphContainer').style.display = 'none';
+  // также авто-переключим вкладку Результаты чтобы было видно
+  switchAtab('results');
   // also push to chat
   appendAgent(`📋 ${sid} — бизнес-обоснование:\n`+html.slice(0,1200));
   document.getElementById('reasoningContent').scrollTop=0;
+}
+async function toggleGraph(){
+  const cont=document.getElementById('graphContainer');
+  const code=document.getElementById('graphCode').textContent;
+  const render=document.getElementById('graphRender');
+  if(cont.style.display==='none'){
+    cont.style.display='block';
+    if(code && code.trim() && !code.includes('(нет графа')){
+      try{
+        const id='m-'+Date.now();
+        const {svg}=await mermaid.render(id, code);
+        render.innerHTML=svg;
+      }catch(e){ render.innerHTML='<div style="color:var(--breach)">Ошибка mermaid: '+escapeHtml(e.message)+'</div><pre style="font-size:10px">'+escapeHtml(code.slice(0,800))+'</pre>'; }
+    } else {
+      render.innerHTML='<div class="small muted">Граф не сгенерирован агентом для этого сценария — reasoning выше</div>';
+    }
+  } else {
+    cont.style.display='none';
+  }
 }
 
 // Submission preview — показываем чистый для сдачи (3 поля), reasoning — отдельный эндпоинт
@@ -815,14 +873,25 @@ async function copySubmission(){
 }
 async function downloadSubmission(){
   try{
-    const r=await fetch('/api/submission');
-    if(!r.ok){ showToast('submission.json не найден — запусти агента','error'); return; }
+    const r=await fetch('/api/download_submission');
+    const ct=r.headers.get('content-type')||'';
+    if(!r.ok){
+      let msg='Ошибка скачивания';
+      try{ const j=await r.json(); msg=j.error||msg; }catch{}
+      showToast(msg,'error'); appendSystem('❌ '+msg); return;
+    }
+    if(ct.includes('application/json')){
+      // fallback если сервер вернул json вместо zip (нет данных)
+      const j=await r.json();
+      if(j.error){ showToast(j.error,'error'); appendSystem('❌ '+j.error); return; }
+    }
     const blob=await r.blob();
     const url=URL.createObjectURL(blob);
-    const a=document.createElement('a'); a.href=url; a.download='submission.json'; a.click();
+    const a=document.createElement('a'); a.href=url; a.download='submission.zip'; a.click();
     URL.revokeObjectURL(url);
-    showToast('Скачиваю submission.json');
-  }catch(e){ showToast('Ошибка скачивания','error'); }
+    showToast('Скачиваю submission.zip (2 файла)');
+    appendSystem('⬇ Скачан ZIP: submission.json (для сдачи) + submission_with_reasoning.json (внутренний)');
+  }catch(e){ showToast('Ошибка скачивания: '+e.message,'error'); }
 }
 
 // Evaluate
@@ -886,6 +955,12 @@ async function runAgent(scenarios=null){
     document.getElementById('btnRun').disabled=false;
     document.getElementById('runIcon').textContent='▶';
   }
+}
+function runSelected(){
+  const vals=[...document.querySelectorAll('#scenarioPicker input:checked')].map(c=>c.value);
+  if(!vals.length) return showToast('Выбери хотя бы один','error');
+  document.getElementById('scenarioPicker').style.display='none';
+  runAgent(vals);
 }
 
 // Upload + общий ресет
