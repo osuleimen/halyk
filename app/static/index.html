@@ -830,6 +830,20 @@ function showReasoning(sid){
   appendAgent(`📋 ${sid} — бизнес-обоснование:\n`+html.slice(0,1200));
   document.getElementById('reasoningContent').scrollTop=0;
 }
+function sanitizeMermaid(code){
+  // Mermaid 11 строже к юникоду и кавычкам внутри [""] — чистим для красоты
+  return code
+    .replace(/→/g, '->')
+    .replace(/—/g, '--')
+    .replace(/–/g, '-')
+    .replace(/≥/g, '>=')
+    .replace(/≤/g, '<=')
+    .replace(/“|”|«|»/g, '"')
+    // экранируем " внутри меток ["..."] — меняем внутренние " на '
+    .replace(/\["([^"]*?)"\]/g, (m, inner)=> `["${inner.replace(/"/g, "'")}"]`)
+    // graph TD → flowchart TD (более стабильно в v11)
+    .replace(/^\s*graph\s+TD/gm, 'flowchart TD');
+}
 async function toggleGraph(){
   const cont=document.getElementById('graphContainer');
   const code=document.getElementById('graphCode').textContent;
@@ -837,11 +851,31 @@ async function toggleGraph(){
   if(cont.style.display==='none'){
     cont.style.display='block';
     if(code && code.trim() && !code.includes('(нет графа')){
-      try{
-        const id='m-'+Date.now();
-        const {svg}=await mermaid.render(id, code);
-        render.innerHTML=svg;
-      }catch(e){ render.innerHTML='<div style="color:var(--breach)">Ошибка mermaid: '+escapeHtml(e.message)+'</div><pre style="font-size:10px">'+escapeHtml(code.slice(0,800))+'</pre>'; }
+      const blocks = code.split(/(?=%% )/).filter(b=>b.trim());
+      const graphs = blocks.length ? blocks : [code];
+      render.innerHTML='';
+      for(let i=0;i<graphs.length;i++){
+        const block = graphs[i].trim();
+        const m = block.match(/graph\s+[A-Z]{2}[\s\S]*|flowchart\s+[A-Z]{2}[\s\S]*/);
+        let mcode = m ? m[0] : block;
+        if(!mcode.trim().match(/^(graph|flowchart)/)) continue;
+        mcode = sanitizeMermaid(mcode);
+        const label = block.match(/%%\s*(P\d+|B\d+)\s+6\.[123]/);
+        const title = label ? label[0].replace('%%','').trim() : `Граф ${i+1}`;
+        const wrap=document.createElement('div');
+        wrap.style.marginBottom='16px';
+        wrap.innerHTML=`<div class="small muted" style="margin-bottom:6px;font-weight:700">${escapeHtml(title)}</div><div id="mwrap-${i}"></div>`;
+        render.appendChild(wrap);
+        try{
+          const id='m-'+Date.now()+'-'+i;
+          const {svg}=await mermaid.render(id, mcode);
+          wrap.querySelector(`#mwrap-${i}`).innerHTML=svg;
+        }catch(e){
+          // вторая попытка — без сантиайзера показать исходник
+          wrap.querySelector(`#mwrap-${i}`).innerHTML='<div style="color:var(--breach)">Ошибка mermaid: '+escapeHtml(e.message)+'</div><pre style="font-size:10px;white-space:pre-wrap;background:var(--surface2);padding:8px;border-radius:8px">'+escapeHtml(mcode.slice(0,1000))+'</pre>';
+        }
+      }
+      if(!render.innerHTML) render.innerHTML='<div class="small muted">Не удалось отрисовать — код ниже</div><pre style="font-size:10px;white-space:pre-wrap">'+escapeHtml(code.slice(0,1500))+'</pre>';
     } else {
       render.innerHTML='<div class="small muted">Граф не сгенерирован агентом для этого сценария — reasoning выше</div>';
     }
