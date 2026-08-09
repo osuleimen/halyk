@@ -451,10 +451,11 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
       <p class="small muted" style="margin:6px 0 10px;line-height:1.6">По каждому ковенанту каждого заёмщика — 3 компонента. Структура строго по <code>submission_template.json</code>.</p>
       <div class="submission-preview">
         <div class="preview-head">
-          <span>submission.json</span>
+          <span>submission.json — 3 поля</span>
           <span style="display:flex;gap:6px">
-            <button class="btn btn-secondary" style="padding:4px 8px;font-size:11px" onclick="copySubmission()">Копировать</button>
-            <button class="btn btn-primary" style="padding:4px 8px;font-size:11px" onclick="downloadSubmission()">Скачать ZIP</button>
+            <button class="btn btn-secondary" style="padding:4px 8px;font-size:11px" onclick="window.open('/api/submission','_blank')">JSON</button>
+            <button class="btn btn-secondary" style="padding:4px 8px;font-size:11px" onclick="window.open('/api/submission_with_reasoning','_blank')">С reasoning</button>
+            <button class="btn btn-primary" style="padding:4px 8px;font-size:11px" onclick="downloadSubmission()">Скачать ZIP (2 файла)</button>
           </span>
         </div>
         <div class="preview-code" id="previewCode">{
@@ -468,6 +469,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 
     }
   }
 }</div>
+        <div class="small muted" style="margin-top:6px;line-height:1.4">ZIP содержит: <code>submission.json</code> (чистый, для сдачи) + <code>submission_with_reasoning.json</code> (внутренний, с reasoning) — веб теперь отдает оба из памяти, а не пустой файл с диска.</div>
       </div>
       <div class="format-list">
         <div class="format-item"><div class="format-icon">①</div><div><h4>Вердикт — status</h4><p><code>COMPLIANT</code> или <code>BREACH</code> • заглавными</p></div></div>
@@ -790,11 +792,19 @@ function showReasoning(sid){
   document.getElementById('reasoningContent').scrollTop=0;
 }
 
-// Submission preview
+// Submission preview — показываем чистый для сдачи (3 поля), reasoning — отдельный эндпоинт
 function updateSubmissionPreview(answers){
   if(!answers || !Object.keys(answers).length) return;
   try{
-    const preview={team:"wit.kz",contact_email:"info@wit.kz",model:"muse-spark-1.2-contributor",answers};
+    const clean={};
+    for(const sid of Object.keys(answers)){
+      clean[sid]={};
+      for(const cid of Object.keys(answers[sid])){
+        const c=answers[sid][cid];
+        clean[sid][cid]={status:c.status, actual:c.actual, evidence_txn_id:c.evidence_txn_id};
+      }
+    }
+    const preview={team:"wit.kz",contact_email:"info@wit.kz",model:"muse-spark-1.2-contributor",answers:clean};
     const str=JSON.stringify(preview,null,2);
     document.getElementById('previewCode').textContent=str.slice(0,2000)+(str.length>2000?'…':'');
   }catch(e){}

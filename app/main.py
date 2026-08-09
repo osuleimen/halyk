@@ -691,24 +691,117 @@ async def api_evaluate():
 
 @app.get("/api/submission")
 async def api_submission():
+    # Генерируем на лету из памяти/кэша — всегда актуально, даже если файл на диске старый/пустой
+    _load_answers_file()
+    if agent_answers:
+        try:
+            with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
+                submission = json.load(f)
+            from config import TEAM_NAME, CONTACT_EMAIL
+            submission["team"] = TEAM_NAME
+            submission["contact_email"] = CONTACT_EMAIL
+            try:
+                from config import get_active_provider as _gap
+                _, pcfg = _gap()
+                submission["model"] = pcfg["models"]["pro"]
+            except Exception:
+                submission["model"] = "muse-spark-1.2-contributor"
+            for sid in submission.get("answers", {}):
+                for cid in submission["answers"][sid]:
+                    src = agent_answers.get(sid, {}).get(cid)
+                    if src and src.get("status"):
+                        submission["answers"][sid][cid] = {"status": src.get("status"), "actual": src.get("actual"), "evidence_txn_id": src.get("evidence_txn_id")}
+            return JSONResponse(submission)
+        except Exception as e:
+            logger.warning(f"dynamic submission failed, fallback to file: {e}")
     if os.path.exists(OUTPUT_PATH):
         return FileResponse(OUTPUT_PATH, filename="submission.json", media_type="application/json")
-    return JSONResponse({"error": "submission.json not found"}, status_code=404)
+    return JSONResponse({"error": "submission.json not found — запусти агента"}, status_code=404)
 
+@app.get("/api/submission_with_reasoning")
+async def api_submission_with_reasoning():
+    """Внутренний файл с reasoning/graph_mermaid — для артефактов, не для сдачи."""
+    _load_answers_file()
+    if not agent_answers:
+        return JSONResponse({"error": "No answers yet — запусти агента"}, status_code=404)
+    try:
+        with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
+            submission = json.load(f)
+        from config import TEAM_NAME, CONTACT_EMAIL
+        submission["team"] = TEAM_NAME
+        submission["contact_email"] = CONTACT_EMAIL
+        try:
+            from config import get_active_provider as _gap2
+            _, pcfg2 = _gap2()
+            submission["model"] = pcfg2["models"]["pro"]
+        except Exception:
+            submission["model"] = "muse-spark-1.2-contributor"
+        for sid in submission.get("answers", {}):
+            for cid in submission["answers"][sid]:
+                src = agent_answers.get(sid, {}).get(cid)
+                if src and src.get("status"):
+                    submission["answers"][sid][cid] = src
+        return JSONResponse(submission)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.get("/api/download_submission")
 async def api_download_submission():
     import zipfile
     import io
-    if not os.path.exists(OUTPUT_PATH):
-        return JSONResponse({"error": "submission.json not found"}, status_code=404)
-        
+    _load_answers_file()
+    # Генерируем оба файла на лету из памяти
+    try:
+        with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
+            base = json.load(f)
+    except Exception as e:
+        return JSONResponse({"error": f"template missing: {e}"}, status_code=500)
+    from config import TEAM_NAME, CONTACT_EMAIL
+    # чистый для сдачи
+    clean = json.loads(json.dumps(base))
+    clean["team"] = TEAM_NAME
+    clean["contact_email"] = CONTACT_EMAIL
+    try:
+        from config import get_active_provider as _gap3
+        _, pcfg3 = _gap3()
+        clean["model"] = pcfg3["models"]["pro"]
+    except Exception:
+        clean["model"] = "muse-spark-1.2-contributor"
+    # полный внутренний
+    full = json.loads(json.dumps(base))
+    full["team"] = TEAM_NAME
+    full["contact_email"] = CONTACT_EMAIL
+    full["model"] = clean["model"]
+    has_any = False
+    for sid in base.get("answers", {}):
+        for cid in base["answers"][sid]:
+            src = agent_answers.get(sid, {}).get(cid) if agent_answers else None
+            if src and src.get("status"):
+                has_any = True
+                clean["answers"][sid][cid] = {"status": src.get("status"), "actual": src.get("actual"), "evidence_txn_id": src.get("evidence_txn_id")}
+                full["answers"][sid][cid] = src
+    if not has_any and not os.path.exists(OUTPUT_PATH):
+        return JSONResponse({"error": "submission.json not found — запусти агента (P6 или все)"}, status_code=404)
+    # если памяти пусто но файл есть — fallback к файлу для clean
+    if not has_any and os.path.exists(OUTPUT_PATH):
+        try:
+            with open(OUTPUT_PATH, "r", encoding="utf-8") as f:
+                clean = json.load(f)
+        except Exception:
+            pass
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
-        zipf.write(OUTPUT_PATH, "submission.json")
+        zipf.writestr("submission.json", json.dumps(clean, ensure_ascii=False, indent=2))
+        zipf.writestr("submission_with_reasoning.json", json.dumps(full, ensure_ascii=False, indent=2))
         if os.path.exists("covenant_logic_graph.md"):
             zipf.write("covenant_logic_graph.md", "covenant_logic_graph.md")
-            
+    # также обновим дисковой чистый файл для консистентности
+    try:
+        with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+            json.dump(clean, f, ensure_ascii=False, indent=2)
+        _save_answers_file()
+    except Exception:
+        pass
     zip_buffer.seek(0)
     from fastapi.responses import StreamingResponse
     return StreamingResponse(
